@@ -1,0 +1,12 @@
+[package]
+name = "rawr"
+description = "Reimplement And Watch Revisions, by mapping between codebases and highlighting when upstream changes affect the existing implementation."
+authors = ["Thomas Johnson <NTmatter@gmail.com>"]
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
