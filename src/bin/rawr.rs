@@ -46,6 +46,10 @@ fn main() -> Result<(), io::Error> {
     let tree = parser.parse(&mut buf, None).expect("Parse test file");
     let cur = tst::traverse(tree.walk(), Order::Pre);
     for node in cur {
+        if !node.is_named() {
+            // continue;
+        }
+
         println!("Node of type {}", node.kind());
 
         match node.kind() {
@@ -66,25 +70,31 @@ fn main() -> Result<(), io::Error> {
     // Search for all rawr attributes.
     let query_string = "
     (attribute_item
-      (attribute (identifier) @id) @att
-      (#eq? @id \"rawr\"))";
+      (attribute (identifier) @rawr
+        (token_tree
+          ((identifier) @id \"=\" (_literal) @lit \",\"?)+)*)
+      (#eq? @rawr \"rawr\"))";
+
     let query = Query::new(tree_sitter_rust::language(), &query_string).expect("Create query");
     let mut query_cursor = QueryCursor::new();
     let matches = query_cursor.matches(&query, tree.root_node(), buf.as_slice());
     matches.for_each(|m| {
         println!(
-            "Capture {} has {} matches",
+            "Match {} has {} captures:",
             m.pattern_index,
             m.captures.len()
         );
+
         m.captures.iter().for_each(|capture| {
             println!(
                 "  {:?} {:?} {:?}",
                 capture,
                 capture.node.range(),
                 String::from_utf8_lossy(&buf[capture.node.start_byte()..capture.node.end_byte()])
-            )
+            );
         });
+
+        println!();
     });
 
     Ok(())
