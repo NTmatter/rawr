@@ -10,6 +10,21 @@ use tree_sitter_rust;
 use tree_sitter_traversal as tst;
 use tree_sitter_traversal::Order;
 
+/// Tree-Sitter query for RAWR annotations attached to various declarations
+// FIXME Only accepts last few rawr attributes. Consider post-filter?
+const RAWR_ANNOTATION_QUERY: &str = "
+    ((attribute_item
+      (attribute
+        (identifier) @rawr
+        (#eq? @rawr \"rawr\")
+        (token_tree
+          ((identifier) @id \"=\" (_literal) @lit \",\"?)+)))+
+      ; Ignore comments
+      . [(line_comment) (block_comment)]*
+      .
+      ; Match most declarations. Consider matching (_) as the annotation can likely go anywhere.
+      [(struct_item) (function_item) (const_item) (enum_item) (enum_variant) (let_declaration)] @item)";
+
 fn main() -> Result<(), io::Error> {
     let args: Vec<String> = args().collect();
     if args.len() < 2 {
@@ -50,7 +65,7 @@ fn main() -> Result<(), io::Error> {
             // continue;
         }
 
-        println!("Node of type {}", node.kind());
+        println!("Node of type {} named: {}", node.kind(), node.is_named());
 
         match node.kind() {
             "source_file" => println!("Source File"),
@@ -67,19 +82,8 @@ fn main() -> Result<(), io::Error> {
     // let query_string = "(function_item name: (identifier) @fn)";
     // let query_string = "(attribute_item)";
 
-    // Search for all rawr attributes.
-    // Captures
-    let query_string = "
-    ((attribute_item
-      (attribute (identifier) @rawr
-        (token_tree
-          ((identifier) @id \"=\" (_literal) @lit \",\"?)+)*)
-      (#eq? @rawr \"rawr\"))
-      [(line_comment) (block_comment)]*
-      .
-      [(struct_item) (function_item) (const_item) (enum_item) (enum_variant) (let_declaration)] @item)";
-
-    let query = Query::new(tree_sitter_rust::language(), &query_string).expect("Create query");
+    let query =
+        Query::new(tree_sitter_rust::language(), &RAWR_ANNOTATION_QUERY).expect("Create query");
     let mut query_cursor = QueryCursor::new();
     let matches = query_cursor.matches(&query, tree.root_node(), buf.as_slice());
     matches.for_each(|m| {

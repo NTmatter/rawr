@@ -1,4 +1,5 @@
 use rawr::rawr;
+use rawr::rawr2;
 fn main() {
     println!("Testing!")
 }
@@ -15,6 +16,7 @@ fn foo(bar: usize) -> Result<(), !> {
 }
 #[derive(Debug)]
 #[rawr(a = 1, b = "abc")]
+#[rawr2(not_relevant = "skipped")]
 #[rawr(c = 2, d = "def")]
 struct S {
     a: Option<String>,

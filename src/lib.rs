@@ -8,3 +8,8 @@ use proc_macro::TokenStream;
 pub fn rawr(_input: TokenStream, _annotated_item: TokenStream) -> TokenStream {
     TokenStream::new()
 }
+
+#[proc_macro_attribute]
+pub fn rawr2(_input: TokenStream, _annotated_item: TokenStream) -> TokenStream {
+    TokenStream::new()
+}
