@@ -68,12 +68,16 @@ fn main() -> Result<(), io::Error> {
     // let query_string = "(attribute_item)";
 
     // Search for all rawr attributes.
+    // Captures
     let query_string = "
-    (attribute_item
+    ((attribute_item
       (attribute (identifier) @rawr
         (token_tree
           ((identifier) @id \"=\" (_literal) @lit \",\"?)+)*)
-      (#eq? @rawr \"rawr\"))";
+      (#eq? @rawr \"rawr\"))
+      [(line_comment) (block_comment)]*
+      .
+      [(struct_item) (function_item) (const_item) (enum_item) (enum_variant) (let_declaration)] @item)";
 
     let query = Query::new(tree_sitter_rust::language(), &query_string).expect("Create query");
     let mut query_cursor = QueryCursor::new();
