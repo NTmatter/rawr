@@ -16,6 +16,7 @@ proc-macro = true
 #syn = "2.0.46"
 #quote = "1.0.35"
 tree-sitter = "0.20.10"
+tree-sitter-bash = "0.20.3"
 tree-sitter-c = "0.20.6"
 tree-sitter-cpp = "0.20.3"
 tree-sitter-rust = "0.20.4"

@@ -5,20 +5,22 @@ use std::fs::File;
 use std::io;
 use std::io::{ErrorKind, Read};
 use tree_sitter;
-use tree_sitter::{Parser, Query, QueryCursor};
+use tree_sitter::{Parser, Query, QueryCursor, QueryMatches};
+use tree_sitter_bash;
 use tree_sitter_rust;
 use tree_sitter_traversal as tst;
 use tree_sitter_traversal::Order;
 
 /// Tree-Sitter query for RAWR annotations attached to various declarations
 // FIXME Only accepts last few rawr attributes. Consider post-filter?
+// Event-based filter makes more sense. This is sufficient for capturing basic rust annotations and their targets.
 const RAWR_ANNOTATION_QUERY: &str = "
     ((attribute_item
       (attribute
         (identifier) @rawr
         (#eq? @rawr \"rawr\")
-        (token_tree
-          ((identifier) @id \"=\" (_literal) @lit \",\"?)+)))+
+        arguments: (token_tree
+          ((identifier) @id \"=\" (_literal) @lit \",\"?)+)))+ @ai
       ; Ignore comments
       . [(line_comment) (block_comment)]*
       .
@@ -27,55 +29,86 @@ const RAWR_ANNOTATION_QUERY: &str = "
 
 fn main() -> Result<(), io::Error> {
     let args: Vec<String> = args().collect();
-    if args.len() < 2 {
+    if args.len() < 3 {
         return Err(io::Error::new(
             ErrorKind::InvalidInput,
-            "At least one path required",
+            "Usage: rawr rust_file bash_file",
         ));
     }
+    let implementation_file = args.get(1).unwrap();
+    let upstream_file = args.get(2).unwrap();
 
-    // Hard-code as Rust
-    let mut default_codebase_default_lang = HashMap::new();
-    default_codebase_default_lang.insert(String::from("/tests"), tree_sitter_rust::language());
-    let default_codebase = Codebase {
-        paths: default_codebase_default_lang,
-    };
+    parse_annotations(implementation_file);
+    parse_bash(upstream_file);
+    Ok(())
+}
 
-    let mut codebases = HashMap::<Option<String>, Codebase>::new();
-    codebases.insert(None, default_codebase);
+fn parse_bash(source_file: &String) {
+    println!("--- Bash ---");
+    let mut parser = Parser::new();
+    parser
+        .set_language(tree_sitter_bash::language())
+        .expect("Create Bash parser");
 
+    let mut source_file = File::open(source_file).expect("Open upstream file");
+    let mut source_bytes = Vec::new();
+    source_file
+        .read_to_end(&mut source_bytes)
+        .expect("Read upstream file");
+
+    let tree = parser
+        .parse(&source_bytes.as_slice(), None)
+        .expect("Parse upstream file");
+
+    let cur = tst::traverse_tree(&tree, Order::Pre);
+    for node in cur {
+        println!("Node: {:?} named: {}", node, node.is_named());
+    }
+
+    // Find variable FOO
+    let query_foo =
+        "(variable_assignment (variable_name) @var \"=\" (_) @body (#eq? @var \"FOO\"))";
+    let query_foo =
+        Query::new(tree_sitter_bash::language(), query_foo).expect("Create query for foo");
+    let mut query_cursor = QueryCursor::new();
+    let matches = query_cursor.matches(&query_foo, tree.root_node(), source_bytes.as_slice());
+    matches.for_each(|m| {
+        println!("Match {}: {:?}", m.pattern_index, m);
+
+        m.captures.iter().for_each(|cap| {
+            println!("\t{}: {:?}", cap.index, cap);
+            println!(
+                "\t\t{:?} {:?}",
+                String::from_utf8_lossy(&source_bytes[cap.node.start_byte()..cap.node.end_byte()]),
+                cap.node.to_sexp(),
+            );
+        })
+    });
+}
+
+fn parse_annotations(source_file: &String) {
     // TODO Iterate over all paths in all codebases.
 
     // see: https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_rust
     let mut parser = Parser::new();
     parser
         .set_language(tree_sitter_rust::language())
-        .expect("Use Rust parser");
-    let source_file = args.get(1).unwrap();
-    let mut source_code = File::open(source_file).expect("Read test file");
-    let file_length = source_code.metadata().expect("Get file metadata").len() as usize;
-    let mut buf: Vec<u8> = Vec::with_capacity(file_length);
-    source_code.read_to_end(&mut buf).expect("Read file");
+        .expect("Create Rust parser");
+    let mut source_file = File::open(source_file).expect("Open test file");
+    let mut source_bytes = Vec::new();
+    source_file
+        .read_to_end(&mut source_bytes)
+        .expect("Read test file");
 
     // Parse and walk tree
-    let tree = parser.parse(&mut buf, None).expect("Parse test file");
-    let cur = tst::traverse(tree.walk(), Order::Pre);
+    let tree = parser
+        .parse(&source_bytes.as_slice(), None)
+        .expect("Parse test file");
+
+    let cur = tst::traverse_tree(&tree, Order::Pre);
     for node in cur {
-        if !node.is_named() {
-            // continue;
-        }
-
         println!("Node of type {} named: {}", node.kind(), node.is_named());
-
-        match node.kind() {
-            "source_file" => println!("Source File"),
-            "attribute_item" => println!("Attribute"),
-            _ => {}
-        };
     }
-
-    // How do we filter this with a query?
-    // see: https://tree-sitter.github.io/tree-sitter/using-parsers#query-syntax
 
     // see https://deepsource.com/blog/lightweight-linting
     println!("--- Matches ---");
@@ -83,46 +116,42 @@ fn main() -> Result<(), io::Error> {
     // let query_string = "(attribute_item)";
 
     let query =
-        Query::new(tree_sitter_rust::language(), &RAWR_ANNOTATION_QUERY).expect("Create query");
+        Query::new(tree_sitter_rust::language(), RAWR_ANNOTATION_QUERY).expect("Create query");
     let mut query_cursor = QueryCursor::new();
-    let matches = query_cursor.matches(&query, tree.root_node(), buf.as_slice());
+    let matches = query_cursor.matches(&query, tree.root_node(), source_bytes.as_slice());
     matches.for_each(|m| {
-        println!(
-            "Match {} has {} captures:",
-            m.pattern_index,
-            m.captures.len()
-        );
+        println!("Match {}: {:?}", m.pattern_index, m);
 
-        m.captures.iter().for_each(|capture| {
+        m.captures.iter().for_each(|cap| {
+            println!("\t{}: {:?}", cap.index, cap);
             println!(
-                "  {:?} {:?} {:?}",
-                capture,
-                capture.node.range(),
-                String::from_utf8_lossy(&buf[capture.node.start_byte()..capture.node.end_byte()])
+                "\t\t{:?} {:?}",
+                String::from_utf8_lossy(&source_bytes[cap.node.start_byte()..cap.node.end_byte()]),
+                cap.node.to_sexp(),
             );
         });
-
-        println!();
     });
-
-    Ok(())
 }
 
 /// Common options for annotations
+#[derive(Eq, PartialEq)]
 pub struct Rawr {
     /// Optional name of codebase that the upstream resides in.
     codebase: Option<String>,
+    /// Git revision (treeish), required
+    rev: String,
     /// Path to original file, relative to codebase root
     path: Option<String>,
     /// Tree-Sitter query identifying the upstream implementation.
-    /// Mutually exclusive to class/function.
+    /// Mutually exclusive to class/function/symbol.
     query: Option<String>,
     class: Option<String>,
     /// Function or class method.
     /// TODO How do we handle function overloading?
     function: Option<String>,
-    /// Git revision (treeish)
-    revision: Option<String>,
+    /// Standalone variables and declarations
+    // Renamee to Variable?
+    symbol: Option<String>,
     /// Free-form notes regarding the implementation.
     notes: Option<String>,
     /// Free-form implementation status. Special case for NO, NONE, WIP, DONE, BROKEN, UPDATE.

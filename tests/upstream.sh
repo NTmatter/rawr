@@ -6,6 +6,7 @@ echo 'Testing!'
 
 # Define important constant for future use.
 FOO=1
+BAR=2
 
 # Accurately count number of light sources
 function foo {
