@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io;
 use std::io::{ErrorKind, Read};
 use tree_sitter;
-use tree_sitter::{Parser, Query, QueryCursor, QueryMatches};
+use tree_sitter::{Parser, Query, QueryCursor, QueryMatches, Tree};
 use tree_sitter_bash;
 use tree_sitter_rust;
 use tree_sitter_traversal as tst;
@@ -68,8 +68,11 @@ fn parse_bash(source_file: &String) {
     // Find variable FOO
     let query_foo =
         "(variable_assignment (variable_name) @var \"=\" (_) @body (#eq? @var \"FOO\"))";
-    let query_foo =
-        Query::new(tree_sitter_bash::language(), query_foo).expect("Create query for foo");
+    print_matches(query_foo, &source_bytes, tree);
+}
+
+fn print_matches(query: &str, source_bytes: &Vec<u8>, tree: Tree) {
+    let query_foo = Query::new(tree.language(), query).expect("Create query for foo");
     let mut query_cursor = QueryCursor::new();
     let matches = query_cursor.matches(&query_foo, tree.root_node(), source_bytes.as_slice());
     matches.for_each(|m| {
@@ -115,22 +118,7 @@ fn parse_annotations(source_file: &String) {
     // let query_string = "(function_item name: (identifier) @fn)";
     // let query_string = "(attribute_item)";
 
-    let query =
-        Query::new(tree_sitter_rust::language(), RAWR_ANNOTATION_QUERY).expect("Create query");
-    let mut query_cursor = QueryCursor::new();
-    let matches = query_cursor.matches(&query, tree.root_node(), source_bytes.as_slice());
-    matches.for_each(|m| {
-        println!("Match {}: {:?}", m.pattern_index, m);
-
-        m.captures.iter().for_each(|cap| {
-            println!("\t{}: {:?}", cap.index, cap);
-            println!(
-                "\t\t{:?} {:?}",
-                String::from_utf8_lossy(&source_bytes[cap.node.start_byte()..cap.node.end_byte()]),
-                cap.node.to_sexp(),
-            );
-        });
-    });
+    print_matches(RAWR_ANNOTATION_QUERY, &source_bytes, tree);
 }
 
 /// Common options for annotations
