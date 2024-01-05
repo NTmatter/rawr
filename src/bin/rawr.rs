@@ -66,15 +66,22 @@ fn parse_bash(source_file: &String) {
     }
 
     // Find variable FOO
-    let query_foo =
-        "(variable_assignment (variable_name) @var \"=\" (_) @body (#eq? @var \"FOO\"))";
-    print_matches(query_foo, &source_bytes, tree);
+    let query = "(variable_assignment (variable_name) @var \"=\" (_) @body (#eq? @var \"FOO\"))";
+    print_matches(query, &source_bytes, &tree);
+
+    let query = "
+    ((function_definition 
+      name: (word) @fname 
+      (#eq @fname \"foo\")
+      body: (compound_statement) @fd))";
+
+    print_matches(query, &source_bytes, &tree);
 }
 
-fn print_matches(query: &str, source_bytes: &Vec<u8>, tree: Tree) {
-    let query_foo = Query::new(tree.language(), query).expect("Create query for foo");
+fn print_matches(query_string: &str, source_bytes: &Vec<u8>, tree: &Tree) {
+    let query = Query::new(tree.language(), query_string).expect("Create query");
     let mut query_cursor = QueryCursor::new();
-    let matches = query_cursor.matches(&query_foo, tree.root_node(), source_bytes.as_slice());
+    let matches = query_cursor.matches(&query, tree.root_node(), source_bytes.as_slice());
     matches.for_each(|m| {
         println!("Match {}: {:?}", m.pattern_index, m);
 
@@ -85,7 +92,7 @@ fn print_matches(query: &str, source_bytes: &Vec<u8>, tree: Tree) {
                 String::from_utf8_lossy(&source_bytes[cap.node.start_byte()..cap.node.end_byte()]),
                 cap.node.to_sexp(),
             );
-        })
+        });
     });
 }
 
@@ -118,7 +125,7 @@ fn parse_annotations(source_file: &String) {
     // let query_string = "(function_item name: (identifier) @fn)";
     // let query_string = "(attribute_item)";
 
-    print_matches(RAWR_ANNOTATION_QUERY, &source_bytes, tree);
+    print_matches(RAWR_ANNOTATION_QUERY, &source_bytes, &tree);
 }
 
 /// Common options for annotations
