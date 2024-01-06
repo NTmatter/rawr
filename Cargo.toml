@@ -13,6 +13,8 @@ license = "Apache-2.0"
 proc-macro = true
 
 [dependencies]
+anyhow = "1.0.79"
+gix = "0.57.1"
 #syn = "2.0.46"
 #quote = "1.0.35"
 tree-sitter = "0.20.10"
