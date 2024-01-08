@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io;
 use std::io::{ErrorKind, Read};
 use tree_sitter;
-use tree_sitter::{Parser, Query, QueryCursor, QueryMatches, Tree};
+use tree_sitter::{Parser, Query, QueryCursor, Tree};
 use tree_sitter_bash;
 use tree_sitter_rust;
 use tree_sitter_traversal as tst;
@@ -70,10 +70,7 @@ fn parse_bash(source_file: &String) {
     print_matches(query, &source_bytes, &tree);
 
     let query = "
-    ((function_definition 
-      name: (word) @fname 
-      (#eq @fname \"foo\")
-      body: (compound_statement) @fd))";
+    (([(function_definition) (variable_assignment)]) @def)";
 
     print_matches(query, &source_bytes, &tree);
 }
@@ -86,12 +83,54 @@ fn print_matches(query_string: &str, source_bytes: &Vec<u8>, tree: &Tree) {
         println!("Match {}: {:?}", m.pattern_index, m);
 
         m.captures.iter().for_each(|cap| {
-            println!("\t{}: {:?}", cap.index, cap);
+            let node = cap.node;
+            println!(
+                "\t{}: {:?}, {} named children",
+                cap.index,
+                cap,
+                node.named_child_count()
+            );
             println!(
                 "\t\t{:?} {:?}",
-                String::from_utf8_lossy(&source_bytes[cap.node.start_byte()..cap.node.end_byte()]),
-                cap.node.to_sexp(),
+                String::from_utf8_lossy(&source_bytes[node.start_byte()..node.end_byte()]),
+                node.to_sexp(),
             );
+
+            // Grammars with named children are easier to pick apart.
+            match node.kind() {
+                "function_definition" => {
+                    if let Some(name) = node.child_by_field_name("name") {
+                        if let Some(body) = node.child_by_field_name("body") {
+                            println!(
+                                "\t\t{} -> {:?}",
+                                String::from_utf8_lossy(
+                                    &source_bytes[name.start_byte()..name.end_byte()]
+                                ),
+                                String::from_utf8_lossy(
+                                    &source_bytes[body.start_byte()..body.end_byte()]
+                                )
+                            )
+                        }
+                    }
+                }
+                "variable_assignment" => {
+                    if let Some(name) = node.child_by_field_name("name") {
+                        if let Some(value) = node.child_by_field_name("value") {
+                            println!(
+                                "\t\t{} = {:?} -- {}",
+                                String::from_utf8_lossy(
+                                    &source_bytes[name.start_byte()..name.end_byte()]
+                                ),
+                                String::from_utf8_lossy(
+                                    &source_bytes[value.start_byte()..value.end_byte()]
+                                ),
+                                node.to_sexp()
+                            );
+                        }
+                    }
+                }
+                _ => {}
+            };
         });
     });
 }
