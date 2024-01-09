@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 use rawr::rawr;
 use rawr::rawr2;
 fn main() {

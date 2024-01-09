@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Learn to use gitoxide. Refer to the Gix examples as a start.
 //! Try to use Gix to read the tree at a particular revision and parse a file with TreeSitter.
 //! Ultimately, I'll need to look for changes to tracked items along a series of revisions.
