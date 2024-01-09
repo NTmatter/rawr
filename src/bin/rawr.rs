@@ -4,10 +4,8 @@
 use std::collections::HashMap;
 use std::env::args;
 use std::fs::File;
-use std::io;
-use std::io::{ErrorKind, Read};
-use tree_sitter;
-use tree_sitter::{Parser, Query, QueryCursor, Tree};
+use std::io::{self, ErrorKind, Read};
+use tree_sitter::{self, Parser, Query, QueryCursor, Tree, TreeCursor};
 use tree_sitter_bash;
 use tree_sitter_rust;
 use tree_sitter_traversal as tst;
@@ -16,7 +14,7 @@ use tree_sitter_traversal::Order;
 /// Tree-Sitter query for RAWR annotations attached to various declarations
 // FIXME Only accepts last few rawr attributes. Consider post-filter?
 // Event-based filter makes more sense. This is sufficient for capturing basic rust annotations and their targets.
-const RAWR_ANNOTATION_QUERY: &str = "
+const FULL_ANNOTATIONS_QUERY: &str = "
     ((attribute_item
       (attribute
         (identifier) @rawr
@@ -28,6 +26,18 @@ const RAWR_ANNOTATION_QUERY: &str = "
       .
       ; Match most declarations. Consider matching (_) as the annotation can likely go anywhere.
       [(struct_item) (function_item) (const_item) (enum_item) (enum_variant) (let_declaration)] @item)";
+
+/// Search for `rawr` annotations in Rust sources
+const ANNOTATION_QUERY: &str = "
+((attribute (identifier) @rawr) @ai
+  (#eq? @rawr \"rawr\"))
+";
+
+/// Match key-value pairs in attribute arguments
+/// TODO Test replacement of iterator
+const ANNOTATION_ATTRIBUTE_QUERY: &str = "
+(arguments: (token_tree ((identifier) @key . \"=\" . (_literal) @val)* @pair))
+";
 
 fn main() -> Result<(), io::Error> {
     let args: Vec<String> = args().collect();
@@ -41,7 +51,7 @@ fn main() -> Result<(), io::Error> {
     let upstream_file = args.get(2).unwrap();
 
     parse_annotations(implementation_file);
-    parse_bash(upstream_file);
+    // parse_bash(upstream_file);
     Ok(())
 }
 
@@ -131,6 +141,28 @@ fn print_matches(query_string: &str, source_bytes: &Vec<u8>, tree: &Tree) {
                         }
                     }
                 }
+                "attribute" => {
+                    if let Some(args) = node.child_by_field_name("arguments") {
+                        // Named children should form key-value pairs.
+                        let mut tree_cursor = args.walk();
+                        let mut children = args.named_children(&mut tree_cursor).into_iter();
+
+                        while let Some(key) = children.next() {
+                            if let Some(val) = children.next() {
+                                println!(
+                                    "\t\t\tArgument: {} = ({}) {}",
+                                    String::from_utf8_lossy(
+                                        &source_bytes[key.start_byte()..key.end_byte()]
+                                    ),
+                                    val.kind(),
+                                    String::from_utf8_lossy(
+                                        &source_bytes[val.start_byte()..val.end_byte()]
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
                 _ => {}
             };
         });
@@ -163,10 +195,8 @@ fn parse_annotations(source_file: &String) {
 
     // see https://deepsource.com/blog/lightweight-linting
     println!("--- Matches ---");
-    // let query_string = "(function_item name: (identifier) @fn)";
-    // let query_string = "(attribute_item)";
 
-    print_matches(RAWR_ANNOTATION_QUERY, &source_bytes, &tree);
+    print_matches(ANNOTATION_QUERY, &source_bytes, &tree);
 }
 
 /// Common options for annotations
