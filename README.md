@@ -17,7 +17,9 @@ It should be possible to use Tree-Sitter to update downstream annotations to min
 
 For early implementation, only enumerate the annotations.
 
-Build rudimentary HTML support with XML snippets in comments. Use this to build documentations from an upstream.
+Build rudimentary HTML support with XML in attributes. Use this to build documentations from an upstream.
+An XML Schema is the way to go, allowing for direct integration with anything that is written with or operates on XML.
+Some languages will still need comment parsing, but nested languages are a problem for later.
 
 # Reference
 * [Tree-Sitter](https://tree-sitter.github.io/): Extract representation of codebases.
