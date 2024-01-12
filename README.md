@@ -3,6 +3,15 @@ Helper tool for porting large or changing codebases. Manually establish a mappin
 
 RAWR leverages Tree-Sitter to track points of interest in the upstream codebase, and GitOxide to traverse the upstream repository while looking for changes in the observed code. Information about points of interest are stored as metadata and annotations in the downstream codebase, avoiding the need to bother or burden the upstream maintainers.
 
+# Current Task
+Enumerate and checksum all items of interest.
+
+Need to track movement of items of interest.
+
+Schema: `(codebase revision file kind identifier) checksum, range`
+
+Additional indexes for file and identifier lookup.
+
 # Notes
 Gather checksums of functions, classes, structs, and files with and without whitespace and comments. The character and byte offsets might also be useful for extracting checksums. Detecting changes inside comments vs implementation could be interesting. This will likely involve a lot of per-language work, as the tree-sitter grammars do not seem to have normalized names for functions, methods, classes, and other objects of interest.
 

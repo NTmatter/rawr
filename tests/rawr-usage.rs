@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#![allow(unused)]
+
 use rawr::rawr;
+// use rawr_addributes::rawr;
+// use rawr::rawr_body;
+
 fn main() {
     println!("Testing!")
 }
@@ -15,10 +20,11 @@ fn foo(bar: usize) -> Result<(), !> {
     println!("There are {bar} lights!");
     Ok(())
 }
-#[derive(Debug)]
+
 #[rawr(a = 1, b = "abc")]
-#[rawr2(not_relevant = "skipped")]
+#[rawr(not_relevant = "skipped")]
 #[rawr(c = 2, d = "def")]
+#[derive(Debug)]
 struct S {
     a: Option<String>,
 }
@@ -34,8 +40,10 @@ enum Foo {
 }
 
 fn bar() {
-    #[rawr(on_var = true)]
     // Comment?
     /* Comment! */
+    // I need an alternate version that runs as a declarative macro
+    // for use inside function bodies.
+    // rawr!(on_statement = true);
     let x = 1;
 }

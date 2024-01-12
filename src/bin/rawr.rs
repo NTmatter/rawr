@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::env::args;
 use std::fs::File;
 use std::io::{self, ErrorKind, Read};
-use tree_sitter::{self, Parser, Query, QueryCursor, Tree, TreeCursor};
+use tree_sitter::{self, Parser, Query, QueryCursor, Tree};
 use tree_sitter_bash;
 use tree_sitter_rust;
 use tree_sitter_traversal as tst;
@@ -51,7 +51,7 @@ fn main() -> Result<(), io::Error> {
     let upstream_file = args.get(2).unwrap();
 
     parse_annotations(implementation_file);
-    // parse_bash(upstream_file);
+    parse_bash(upstream_file);
     Ok(())
 }
 
