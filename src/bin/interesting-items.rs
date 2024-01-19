@@ -7,13 +7,23 @@
 #![allow(unused_imports)]
 
 use gix::attrs::Name;
+use std::any::Any;
 use std::collections::HashMap;
+use std::path::Path;
 
-use tree_sitter::Language;
+use tree_sitter::{Language, QueryMatch};
 use tree_sitter_bash;
 use tree_sitter_c;
 use tree_sitter_cpp;
 use tree_sitter_rust;
+
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub enum SupportedLanguage {
+    Rust,
+    Bash,
+    C,
+    Cpp,
+}
 
 #[derive(Debug, Eq, PartialEq)]
 struct Codebase {
@@ -75,11 +85,37 @@ pub struct Watched {
 }
 
 fn main() -> anyhow::Result<()> {
-    let mut language_matchers = HashMap::<Language, Vec<Matcher>>::new();
+    let mut language_matchers = HashMap::<SupportedLanguage, Vec<Matcher>>::new();
 
-    language_matchers.insert(tree_sitter_rust::language(), matchers_rust());
-    language_matchers.insert(tree_sitter_bash::language(), matchers_bash());
+    language_matchers.insert(SupportedLanguage::Rust, matchers_rust());
+    language_matchers.insert(SupportedLanguage::Bash, matchers_bash());
     Ok(())
+}
+
+fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<Vec<Interesting>> {
+    println!("Searching for matches in {}", path.display());
+
+    let matchers = match lang {
+        SupportedLanguage::Rust => matchers_rust(),
+        SupportedLanguage::Bash => matchers_bash(),
+        SupportedLanguage::C => todo!(),
+        SupportedLanguage::Cpp => todo!(),
+    };
+
+    // Open and parse file
+
+    // Find matches
+    let _interesting_matches = Vec::<Interesting>::new();
+    for _matcher in matchers {
+        // Find matches and extract information
+    }
+
+    // These should probably be concatenated for efficiency, but settle for repeated searches. O(matches * files)
+    todo!("Open file, parse, and build list of all matches");
+}
+
+fn process_match(_query_match: QueryMatch) -> Interesting {
+    todo!("Extract match bounds, name, and checksum")
 }
 
 /// Build list of items that should be matched for Rust
@@ -104,6 +140,7 @@ fn matchers_rust() -> Vec<Matcher> {
     ]
 }
 
+/// Build list of items that should be matched for Bash
 fn matchers_bash() -> Vec<Matcher> {
     use MatchType::*;
     vec![
