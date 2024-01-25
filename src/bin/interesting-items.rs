@@ -6,12 +6,16 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
+use anyhow::{anyhow, bail};
 use gix::attrs::Name;
 use std::any::Any;
 use std::collections::HashMap;
+use std::ffi::OsStr;
+use std::io::Read;
+use std::path;
 use std::path::Path;
 
-use tree_sitter::{Language, QueryMatch};
+use tree_sitter::{Language, Parser, QueryMatch};
 use tree_sitter_bash;
 use tree_sitter_c;
 use tree_sitter_cpp;
@@ -85,33 +89,80 @@ pub struct Watched {
 }
 
 fn main() -> anyhow::Result<()> {
+    // Build matchers for supported languages
     let mut language_matchers = HashMap::<SupportedLanguage, Vec<Matcher>>::new();
-
     language_matchers.insert(SupportedLanguage::Rust, matchers_rust());
     language_matchers.insert(SupportedLanguage::Bash, matchers_bash());
+
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 {
+        bail!("File names must be specified");
+    }
+
+    // Process known filetypes
+    args.into_iter().skip(1).for_each(|arg| {
+        let path = Path::new(&arg);
+
+        let Some(file_extension) = path.extension() else {
+            return;
+        };
+
+        let lang = match file_extension.to_str() {
+            Some("rs") => SupportedLanguage::Rust,
+            Some("sh") => SupportedLanguage::Bash,
+            _ => return,
+        };
+
+        let Ok(matches) = find_matches_in_file(path, lang) else {
+            return;
+        };
+
+        println!("Found {} matches in file.", matches.len());
+    });
+
     Ok(())
 }
 
 fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<Vec<Interesting>> {
     println!("Searching for matches in {}", path.display());
 
-    let matchers = match lang {
-        SupportedLanguage::Rust => matchers_rust(),
-        SupportedLanguage::Bash => matchers_bash(),
+    let (language, matchers) = match lang {
+        SupportedLanguage::Rust => (tree_sitter_rust::language(), matchers_rust()),
+        SupportedLanguage::Bash => (tree_sitter_bash::language(), matchers_bash()),
         SupportedLanguage::C => todo!(),
         SupportedLanguage::Cpp => todo!(),
     };
 
-    // Open and parse file
+    // Open and read file
+    let mut file = std::fs::File::open(path)?;
+    let mut source_bytes = Vec::new();
+    file.read_to_end(&mut source_bytes)?;
+
+    // Parse file
+    let mut parser = Parser::new();
+    parser
+        .set_language(language)
+        .expect("Create language parser");
+
+    let tree = parser
+        .parse(&source_bytes.as_slice(), None)
+        .expect("Parse file");
 
     // Find matches
-    let _interesting_matches = Vec::<Interesting>::new();
-    for _matcher in matchers {
+    let interesting_matches = Vec::<Interesting>::new();
+    for matcher in matchers {
         // Find matches and extract information
+        println!(
+            "Matching {} for {}: {}",
+            path.to_str().unwrap_or("Bad Path"),
+            matcher.name,
+            matcher.notes.unwrap_or(String::from(""))
+        )
     }
 
     // These should probably be concatenated for efficiency, but settle for repeated searches. O(matches * files)
-    todo!("Open file, parse, and build list of all matches");
+    // todo!("Open file, parse, and build list of all matches");
+    Ok(interesting_matches)
 }
 
 fn process_match(_query_match: QueryMatch) -> Interesting {
