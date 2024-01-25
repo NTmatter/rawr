@@ -15,7 +15,7 @@ use std::io::Read;
 use std::path;
 use std::path::Path;
 
-use tree_sitter::{Language, Parser, QueryMatch};
+use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
 use tree_sitter_bash;
 use tree_sitter_c;
 use tree_sitter_cpp;
@@ -157,7 +157,18 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
             path.to_str().unwrap_or("Bad Path"),
             matcher.name,
             matcher.notes.unwrap_or(String::from(""))
-        )
+        );
+
+        let Ok(query) = Query::new(language, matcher.query.as_str()) else {
+            println!("Skipping unparseable query {}", matcher.query);
+            continue;
+        };
+        let mut cursor = QueryCursor::new();
+
+        let matches = cursor.matches(&query, tree.root_node(), source_bytes.as_slice());
+        matches.for_each(|matched| {
+            process_match(matched);
+        })
     }
 
     // These should probably be concatenated for efficiency, but settle for repeated searches. O(matches * files)
