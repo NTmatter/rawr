@@ -192,6 +192,7 @@ fn process_match(
     };
 
     // Identifier
+    // FIXME Need to hand back a string, which could possibly be a constant value like the filename or empty string.
     let Some(identifier_match) = (match &matcher.identifier {
         MatchType::Match => Some(root_match.node),
         MatchType::Kind(_) => {
@@ -248,9 +249,11 @@ fn process_match(
     None
 }
 
-/// Build list of items that should be matched for Rust
+/// Build list of items that should be matched for Rust.
 fn matchers_rust() -> Vec<Matcher> {
-    // Could be handy to turn this into a declarative macro for brevity. There's a lot of `.to_string()` here.
+    // Could be handy to turn this into a declarative macro for brevity, cutting
+    // the need for to_string invocations. Alternatively, this should probably
+    // be pushed into a static file with a limited grammar.
     use MatchType::*;
     vec![
         Matcher {
@@ -265,6 +268,21 @@ fn matchers_rust() -> Vec<Matcher> {
             query: "((struct_item) @si)".to_string(),
             identifier: Named("name".to_string()),
             contents: Match,
+            notes: None,
+        },
+        Matcher {
+            kind: "const".to_string(),
+            query: "((const_item) @ci)".to_string(),
+            identifier: Named("name".to_string()),
+            // Should be the entire match, or possibly just the type and value.
+            contents: Named("value".to_string()),
+            notes: None,
+        },
+        Matcher {
+            kind: "enum".to_string(),
+            query: "((enum_item) @ei)".to_string(),
+            identifier: Named("name".to_string()),
+            contents: Named("body".to_string()),
             notes: None,
         },
     ]
