@@ -40,6 +40,10 @@ struct Codebase {
 /// new query to extract the node.
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum MatchType {
+    /// Reuse the entire match
+    Match,
+    /// A named type from the grammar
+    Kind(String),
     /// Named child to extract as text.
     Named(String),
     /// Tree-Sitter query and nth-match from which to extract text.
@@ -51,13 +55,14 @@ pub enum MatchType {
 #[derive(Debug, Eq, PartialEq)]
 pub struct Matcher {
     /// Friendly name for matches
-    name: String,
+    kind: String,
     /// Tree-Sitter query to match items of this type
+    // TODO Convert over to MatchType to
     query: String,
     /// Name of field containing item.
     identifier: MatchType,
     /// Name of field containing body contents.
-    body: MatchType,
+    contents: MatchType,
     /// Human-readable information about this matcher.
     notes: Option<String>,
 }
@@ -150,17 +155,23 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
 
     // Find matches
     let interesting_matches = Vec::<Interesting>::new();
-    for matcher in matchers {
+    for matcher in &matchers {
+        println!("Matching {}", matcher.kind);
         // Find matches and extract information
-        let Ok(query) = Query::new(language, matcher.query.as_str()) else {
-            println!("Skipping unparseable query {}", matcher.query);
-            continue;
+        let query = match Query::new(language, matcher.query.as_str()) {
+            Ok(query) => query,
+            Err(e) => {
+                eprintln!("Skipping unparseable query {}", matcher.query);
+                eprintln!("{}", e);
+                continue;
+            }
         };
-        let mut cursor = QueryCursor::new();
 
+        let mut cursor = QueryCursor::new();
         let matches = cursor.matches(&query, tree.root_node(), source_bytes.as_slice());
         matches.for_each(|matched| {
-            process_match(&language, &matcher, &matched);
+            println!("Got Match");
+            process_match(&language, &source_bytes, &matcher, &matched);
         });
     }
 
@@ -171,6 +182,7 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
 
 fn process_match(
     language: &Language,
+    sources: &[u8],
     matcher: &Matcher,
     matched: &QueryMatch,
 ) -> Option<Interesting> {
@@ -178,22 +190,55 @@ fn process_match(
         return None;
     };
 
-    let cursor = QueryCursor::new();
-
     // Identifier
-    match &matcher.identifier {
-        MatchType::Named(child_name) => {
-            root_match.node.child_by_field_name(child_name);
+    let Some(identifier_match) = (match &matcher.identifier {
+        MatchType::Match => Some(root_match.node),
+        MatchType::Kind(_) => {
+            todo!("Build query for subtype")
         }
-        MatchType::Query(query_string, match_id) => {
-            let query =
+        MatchType::Named(child_name) => root_match.node.child_by_field_name(child_name),
+        MatchType::Query(query_string, _match_id) => {
+            let _query =
                 Query::new(*language, query_string.as_str()).expect("Parse identifier query");
+            let mut _cursor = QueryCursor::new();
+            todo!("Return results of sub-query")
         }
-    }
+    }) else {
+        println!("Failed to match identifier");
+        return None;
+    };
 
-    // Body
+    let identifier = &sources[identifier_match.start_byte()..identifier_match.end_byte()];
+    let identifier = String::from_utf8_lossy(identifier);
+    println!("Found identifier named {}", identifier);
 
-    todo!()
+    // Contents
+    let Some(contents_match) = (match &matcher.contents {
+        MatchType::Match => Some(root_match.node),
+        MatchType::Kind(kind) => {
+            let query_string = format!("(({}) @kind)", kind);
+            let _query = Query::new(*language, query_string.as_str()).expect("Query for kind");
+            todo!("Build query for subtype")
+        }
+        MatchType::Named(child_name) => root_match.node.child_by_field_name(child_name),
+        MatchType::Query(query_string, _match_id) => {
+            let _query = Query::new(*language, query_string.as_str()).expect("Parse matcher query");
+            let mut _cursor = QueryCursor::new();
+            todo!("Return results of sub-query")
+        }
+    }) else {
+        println!("Failed to match contents");
+        return None;
+    };
+
+    let identifier = &sources[contents_match.start_byte()..contents_match.end_byte()];
+    let identifier = String::from_utf8_lossy(identifier);
+    println!("Using contents {}", identifier);
+
+    // TODO Checksum
+    // TODO Construct result
+
+    None
 }
 
 /// Build list of items that should be matched for Rust
@@ -202,17 +247,17 @@ fn matchers_rust() -> Vec<Matcher> {
     use MatchType::*;
     vec![
         Matcher {
-            name: "function".to_string(),
-            query: "(function)".to_string(),
+            kind: "function".to_string(),
+            query: "((function_item) @fi)".to_string(),
             identifier: Named("name".to_string()),
-            body: Named("body".to_string()),
+            contents: Match,
             notes: Some("Match all functions".to_string()),
         },
         Matcher {
-            name: "struct".to_string(),
-            query: "(struct)".to_string(),
+            kind: "struct".to_string(),
+            query: "((struct_item) @si)".to_string(),
             identifier: Named("name".to_string()),
-            body: Named("fields".to_string()),
+            contents: Match,
             notes: None,
         },
     ]
@@ -223,17 +268,17 @@ fn matchers_bash() -> Vec<Matcher> {
     use MatchType::*;
     vec![
         Matcher {
-            name: "Variable".to_string(),
+            kind: "Variable".to_string(),
             query: "(variable_assignment)".to_string(),
             identifier: Named("name".to_string()),
-            body: Named("value".to_string()),
+            contents: Named("value".to_string()),
             notes: None,
         },
         Matcher {
-            name: "Function".to_string(),
+            kind: "Function".to_string(),
             query: "(fuwction_definition)".to_string(),
             identifier: Named("nawe".to_string()),
-            body: Named("body".to_string()),
+            contents: Named("body".to_string()),
             notes: None,
         },
     ]
