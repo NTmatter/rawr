@@ -15,7 +15,9 @@ proc-macro = true
 [dependencies]
 anyhow = "1.0.79"
 gix = "0.57.1"
+rand = "0.8.5"
 rusqlite = { version = "0.30.0", features = ["bundled"] }
+sha2 = "0.10.8"
 #syn = "2.0.46"
 #quote = "1.0.35"
 tree-sitter = "0.20.10"

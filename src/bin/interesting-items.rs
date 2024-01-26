@@ -8,6 +8,7 @@
 
 use anyhow::{anyhow, bail};
 use gix::attrs::Name;
+use sha2::{Digest, Sha256};
 use std::any::Any;
 use std::collections::HashMap;
 use std::ffi::OsStr;
@@ -231,11 +232,17 @@ fn process_match(
         return None;
     };
 
-    let identifier = &sources[contents_match.start_byte()..contents_match.end_byte()];
-    let identifier = String::from_utf8_lossy(identifier);
-    println!("Using contents {}", identifier);
+    let contents = &sources[contents_match.start_byte()..contents_match.end_byte()];
 
-    // TODO Checksum
+    // Salted hash of contents, in case of sensitive data.
+    let mut hasher = Sha256::new();
+
+    let salt: u64 = rand::random();
+    hasher.update(salt.to_be_bytes());
+    hasher.update(contents);
+    let hash = format!("sha256:{:x}:{:02x}", salt, Sha256::digest(contents));
+    dbg!(hash);
+
     // TODO Construct result
 
     None
