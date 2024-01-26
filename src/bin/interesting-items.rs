@@ -152,13 +152,6 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     let interesting_matches = Vec::<Interesting>::new();
     for matcher in matchers {
         // Find matches and extract information
-        println!(
-            "Matching {} for {}: {}",
-            path.to_str().unwrap_or("Bad Path"),
-            matcher.name,
-            matcher.notes.unwrap_or(String::from(""))
-        );
-
         let Ok(query) = Query::new(language, matcher.query.as_str()) else {
             println!("Skipping unparseable query {}", matcher.query);
             continue;
@@ -167,8 +160,8 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
 
         let matches = cursor.matches(&query, tree.root_node(), source_bytes.as_slice());
         matches.for_each(|matched| {
-            process_match(matched);
-        })
+            process_match(&language, &matcher, &matched);
+        });
     }
 
     // These should probably be concatenated for efficiency, but settle for repeated searches. O(matches * files)
@@ -176,8 +169,31 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     Ok(interesting_matches)
 }
 
-fn process_match(_query_match: QueryMatch) -> Interesting {
-    todo!("Extract match bounds, name, and checksum")
+fn process_match(
+    language: &Language,
+    matcher: &Matcher,
+    matched: &QueryMatch,
+) -> Option<Interesting> {
+    let Some(root_match) = matched.captures.get(0) else {
+        return None;
+    };
+
+    let cursor = QueryCursor::new();
+
+    // Identifier
+    match &matcher.identifier {
+        MatchType::Named(child_name) => {
+            root_match.node.child_by_field_name(child_name);
+        }
+        MatchType::Query(query_string, match_id) => {
+            let query =
+                Query::new(*language, query_string.as_str()).expect("Parse identifier query");
+        }
+    }
+
+    // Body
+
+    todo!()
 }
 
 /// Build list of items that should be matched for Rust
