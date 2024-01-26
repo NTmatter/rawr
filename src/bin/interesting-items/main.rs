@@ -6,14 +6,13 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-use anyhow::{anyhow, bail};
-use gix::attrs::Name;
+mod rawr_lib;
+
+use anyhow::bail;
 use sha2::{Digest, Sha256};
 use std::any::Any;
 use std::collections::HashMap;
-use std::ffi::OsStr;
 use std::io::Read;
-use std::path;
 use std::path::Path;
 
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
@@ -21,84 +20,13 @@ use tree_sitter_bash;
 use tree_sitter_c;
 use tree_sitter_cpp;
 use tree_sitter_rust;
-
-#[derive(Debug, Eq, PartialEq, Hash)]
-pub enum SupportedLanguage {
-    Rust,
-    Bash,
-    C,
-    Cpp,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-struct Codebase {
-    name: String,
-    relative_path: String,
-    notes: Option<String>,
-}
-
-/// Extract information with a named match in the Tree-Sitter grammar, or use a
-/// new query to extract the node.
-#[derive(Debug, Eq, PartialEq, Hash)]
-pub enum MatchType {
-    /// Reuse the entire match
-    Match,
-    /// A named type from the grammar
-    Kind(String),
-    /// Named child to extract as text.
-    Named(String),
-    /// Tree-Sitter query and nth-match from which to extract text.
-    Query(String, usize),
-}
-
-/// Assumes that the interesting parts are actually named in the Tree-Sitter
-/// grammar.
-#[derive(Debug, Eq, PartialEq)]
-pub struct Matcher {
-    /// Friendly name for matches
-    kind: String,
-    /// Tree-Sitter query to match items of this type
-    // TODO Convert over to MatchType to
-    query: String,
-    /// Name of field containing item.
-    identifier: MatchType,
-    /// Name of field containing body contents.
-    contents: MatchType,
-    /// Human-readable information about this matcher.
-    notes: Option<String>,
-}
-
-/// Automatically-matched item of interest.
-#[derive(Debug, Eq, PartialEq)]
-pub struct Interesting {
-    codebase: String,
-    revision: String,
-    path: String,
-    kind: String,
-    identifier: String,
-    start_byte: usize,
-    end_byte: usize,
-    checksum: String,
-    notes: Option<String>,
-}
-
-#[derive(Debug, Eq, PartialEq)]
-pub struct Watched {
-    codebase: String,
-    revision: String,
-
-    path: Option<String>,
-    kind: Option<String>,
-    identifier: Option<String>,
-    checksum: String,
-    notes: Option<String>,
-}
+use rawr_lib::{Interesting, Matcher, MatchType, SupportedLanguage};
 
 fn main() -> anyhow::Result<()> {
     // Build matchers for supported languages
     let mut language_matchers = HashMap::<SupportedLanguage, Vec<Matcher>>::new();
-    language_matchers.insert(SupportedLanguage::Rust, matchers_rust());
-    language_matchers.insert(SupportedLanguage::Bash, matchers_bash());
+    language_matchers.insert(SupportedLanguage::Rust, rawr_lib::matchers_rust());
+    language_matchers.insert(SupportedLanguage::Bash, rawr_lib::matchers_bash());
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
@@ -133,8 +61,8 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     println!("Searching for matches in {}", path.display());
 
     let (language, matchers) = match lang {
-        SupportedLanguage::Rust => (tree_sitter_rust::language(), matchers_rust()),
-        SupportedLanguage::Bash => (tree_sitter_bash::language(), matchers_bash()),
+        SupportedLanguage::Rust => (tree_sitter_rust::language(), rawr_lib::matchers_rust()),
+        SupportedLanguage::Bash => (tree_sitter_bash::language(), rawr_lib::matchers_bash()),
         SupportedLanguage::C => todo!(),
         SupportedLanguage::Cpp => todo!(),
     };
@@ -247,64 +175,4 @@ fn process_match(
     // TODO Construct result
 
     None
-}
-
-/// Build list of items that should be matched for Rust.
-fn matchers_rust() -> Vec<Matcher> {
-    // Could be handy to turn this into a declarative macro for brevity, cutting
-    // the need for to_string invocations. Alternatively, this should probably
-    // be pushed into a static file with a limited grammar.
-    use MatchType::*;
-    vec![
-        Matcher {
-            kind: "function".to_string(),
-            query: "((function_item) @fi)".to_string(),
-            identifier: Named("name".to_string()),
-            contents: Match,
-            notes: Some("Match all functions".to_string()),
-        },
-        Matcher {
-            kind: "struct".to_string(),
-            query: "((struct_item) @si)".to_string(),
-            identifier: Named("name".to_string()),
-            contents: Match,
-            notes: None,
-        },
-        Matcher {
-            kind: "const".to_string(),
-            query: "((const_item) @ci)".to_string(),
-            identifier: Named("name".to_string()),
-            // Should be the entire match, or possibly just the type and value.
-            contents: Named("value".to_string()),
-            notes: None,
-        },
-        Matcher {
-            kind: "enum".to_string(),
-            query: "((enum_item) @ei)".to_string(),
-            identifier: Named("name".to_string()),
-            contents: Named("body".to_string()),
-            notes: None,
-        },
-    ]
-}
-
-/// Build list of items that should be matched for Bash
-fn matchers_bash() -> Vec<Matcher> {
-    use MatchType::*;
-    vec![
-        Matcher {
-            kind: "Variable".to_string(),
-            query: "(variable_assignment)".to_string(),
-            identifier: Named("name".to_string()),
-            contents: Named("value".to_string()),
-            notes: None,
-        },
-        Matcher {
-            kind: "Function".to_string(),
-            query: "(fuwction_definition)".to_string(),
-            identifier: Named("nawe".to_string()),
-            contents: Named("body".to_string()),
-            notes: None,
-        },
-    ]
 }
