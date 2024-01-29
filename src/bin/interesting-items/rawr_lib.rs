@@ -1,4 +1,3 @@
-
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum SupportedLanguage {
     Rust,
@@ -21,11 +20,15 @@ pub enum MatchType {
     /// Reuse the entire match
     Match,
     /// A named type from the grammar
-    Kind(String),
+    Kind(String, usize),
     /// Named child to extract as text.
     Named(String),
     /// Tree-Sitter query and nth-match from which to extract text.
     Query(String, usize),
+    /// Use a fixed string in place of a match.
+    Static(String),
+    /// Substitute in a variable
+    Variable(String),
 }
 
 /// Assumes that the interesting parts are actually named in the Tree-Sitter

@@ -11,16 +11,17 @@ mod rawr_lib;
 use anyhow::bail;
 use sha2::{Digest, Sha256};
 use std::any::Any;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 
+use rawr_lib::{Interesting, MatchType, Matcher, SupportedLanguage};
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
 use tree_sitter_bash;
 use tree_sitter_c;
 use tree_sitter_cpp;
 use tree_sitter_rust;
-use rawr_lib::{Interesting, Matcher, MatchType, SupportedLanguage};
 
 fn main() -> anyhow::Result<()> {
     // Build matchers for supported languages
@@ -85,7 +86,6 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     // Find matches
     let interesting_matches = Vec::<Interesting>::new();
     for matcher in &matchers {
-        println!("Matching {}", matcher.kind);
         // Find matches and extract information
         let query = match Query::new(language, matcher.query.as_str()) {
             Ok(query) => query,
@@ -99,7 +99,6 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
         let mut cursor = QueryCursor::new();
         let matches = cursor.matches(&query, tree.root_node(), source_bytes.as_slice());
         matches.for_each(|matched| {
-            println!("Got Match");
             process_match(&language, &source_bytes, &matcher, &matched);
         });
     }
@@ -119,49 +118,89 @@ fn process_match(
         return None;
     };
 
-    // Identifier
+    // Identifier: Extract a string
     // FIXME Need to hand back a string, which could possibly be a constant value like the filename or empty string.
-    let Some(identifier_match) = (match &matcher.identifier {
-        MatchType::Match => Some(root_match.node),
-        MatchType::Kind(_) => {
+    let identifier_text = match &matcher.identifier {
+        MatchType::Match => {
+            let range = root_match.node.start_byte()..root_match.node.end_byte();
+            let text = String::from_utf8_lossy(&sources[range]);
+            Some(text)
+        }
+        MatchType::Kind(_kind, _index) => {
+            // Iterate over children to find one of the right kind.
             todo!("Build query for subtype")
         }
-        MatchType::Named(child_name) => root_match.node.child_by_field_name(child_name),
+        MatchType::Named(child_name) => {
+            let child = root_match.node.child_by_field_name(child_name);
+            if let Some(node) = child {
+                let range = node.start_byte()..node.end_byte();
+                let text = String::from_utf8_lossy(&sources[range]);
+                Some(text)
+            } else {
+                None
+            }
+        }
         MatchType::Query(query_string, _match_id) => {
             let _query =
                 Query::new(*language, query_string.as_str()).expect("Parse identifier query");
             let mut _cursor = QueryCursor::new();
             todo!("Return results of sub-query")
         }
-    }) else {
+        MatchType::Static(text) => Some(Cow::from(text)),
+        MatchType::Variable(_var_name) => {
+            // Merge with Static, use some kind of interpolated string?
+            todo!("Substitute a variable name, or fail if it's unknown")
+        }
+    };
+
+    let Some(identifier) = identifier_text else {
         println!("Failed to match identifier");
         return None;
     };
 
-    let identifier = &sources[identifier_match.start_byte()..identifier_match.end_byte()];
-    let identifier = String::from_utf8_lossy(identifier);
-    println!("Found identifier named {}", identifier);
-
+    // TODO Get matched bytes, then convert to string for identifiers
     // Contents
-    let Some(contents_match) = (match &matcher.contents {
-        MatchType::Match => Some(root_match.node),
-        MatchType::Kind(kind) => {
+    let body_bytes = match &matcher.contents {
+        MatchType::Match => {
+            let range = root_match.node.start_byte()..root_match.node.end_byte();
+            let bytes = &sources[range];
+            Some(bytes)
+        }
+        MatchType::Kind(kind, _index) => {
             let query_string = format!("(({}) @kind)", kind);
             let _query = Query::new(*language, query_string.as_str()).expect("Query for kind");
             todo!("Build query for subtype")
         }
-        MatchType::Named(child_name) => root_match.node.child_by_field_name(child_name),
+        MatchType::Named(child_name) => {
+            let child_node = root_match.node.child_by_field_name(child_name);
+            if let Some(node) = child_node {
+                let range = node.start_byte()..node.end_byte();
+                let bytes = &sources[range];
+                Some(bytes)
+            } else {
+                None
+            }
+        }
         MatchType::Query(query_string, _match_id) => {
             let _query = Query::new(*language, query_string.as_str()).expect("Parse matcher query");
             let mut _cursor = QueryCursor::new();
             todo!("Return results of sub-query")
         }
-    }) else {
+        MatchType::Static(text) => Some(text.as_bytes()),
+        MatchType::Variable(var_name) => {
+            if var_name == "${file_name}" {
+                Some("FILE-NAME-HERE".as_bytes())
+            } else {
+                // Merge with Static, use some kind of interpolated string?
+                todo!("Substitute a variable name, or fail if it's unknown")
+            }
+        }
+    };
+
+    let Some(contents) = body_bytes else {
         println!("Failed to match contents");
         return None;
     };
-
-    let contents = &sources[contents_match.start_byte()..contents_match.end_byte()];
 
     // Salted hash of contents, in case of sensitive data.
     let mut hasher = Sha256::new();
@@ -170,9 +209,8 @@ fn process_match(
     hasher.update(salt.to_be_bytes());
     hasher.update(contents);
     let hash = format!("sha256:{:x}:{:02x}", salt, Sha256::digest(contents));
-    dbg!(hash);
 
-    // TODO Construct result
-
+    // TODO Construct actual result object
+    println!("({}) {} -> {}", matcher.kind, identifier, hash);
     None
 }
