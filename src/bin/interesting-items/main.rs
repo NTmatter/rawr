@@ -84,7 +84,7 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
         .expect("Parse file");
 
     // Find matches
-    let interesting_matches = Vec::<Interesting>::new();
+    let mut interesting_matches = Vec::<Interesting>::new();
     for matcher in &matchers {
         // Find matches and extract information
         let query = match Query::new(language, matcher.query.as_str()) {
@@ -98,9 +98,18 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
 
         let mut cursor = QueryCursor::new();
         let matches = cursor.matches(&query, tree.root_node(), source_bytes.as_slice());
-        matches.for_each(|matched| {
-            process_match(&path, &language, &source_bytes, &matcher, &matched);
+        let processed = matches.filter_map(|matched| {
+            process_match(
+                &"(self)".to_string(),
+                &"(unversioned)".to_string(),
+                &path,
+                &language,
+                &source_bytes,
+                &matcher,
+                &matched,
+            )
         });
+        interesting_matches.extend(processed);
     }
 
     // These should probably be concatenated for efficiency, but settle for repeated searches. O(matches * files)
@@ -109,6 +118,8 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
 }
 
 fn process_match(
+    codebase: &String,
+    revision: &String,
     path: &Path,
     language: &Language,
     source_bytes: &[u8],
@@ -166,6 +177,7 @@ fn process_match(
     };
 
     // TODO Get matched bytes, then convert to string for identifiers?
+    // TODO Try to capture start and length
     // Contents
     let body_bytes = match &matcher.contents {
         MatchType::Match => {
@@ -209,14 +221,26 @@ fn process_match(
     };
 
     // Salted hash of contents, in case of sensitive data.
+    let hash_algorithm = "sha256".to_string();
     let mut hasher = Sha256::new();
 
     let salt: u64 = rand::random();
     hasher.update(salt.to_be_bytes());
     hasher.update(contents);
-    let hash = format!("sha256:{:x}:{:02x}", salt, Sha256::digest(contents));
 
-    // TODO Construct actual result object
-    println!("({}) {} -> {}", matcher.kind, identifier, hash);
-    None
+    let hash = format!("{:02x}", Sha256::digest(contents));
+
+    Some(Interesting {
+        codebase: codebase.to_string(),
+        revision: revision.to_string(),
+        path: file_path.to_string(),
+        start_byte: None,
+        length: None,
+        kind: matcher.kind.to_string(),
+        identifier: identifier.to_string(),
+        hash_algorithm,
+        salt,
+        hash,
+        notes: None,
+    })
 }
