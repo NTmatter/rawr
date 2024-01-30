@@ -79,11 +79,21 @@ pub fn matchers_rust() -> Vec<Matcher> {
     use MatchType::*;
     vec![
         Matcher {
+            kind: "file".to_string(),
+            query: "((source_file) @f)".to_string(),
+            identifier: Variable("${file_name}".to_string()),
+            contents: Match,
+            notes: Some("Exact contents of entire file".to_string()),
+        },
+        Matcher {
             kind: "function".to_string(),
             query: "((function_item) @fi)".to_string(),
             identifier: Named("name".to_string()),
             contents: Match,
-            notes: Some("Match all functions".to_string()),
+            notes: Some(
+                "Function, including visibility, name, parameters, return type, and body "
+                    .to_string(),
+            ),
         },
         Matcher {
             kind: "struct".to_string(),

@@ -99,7 +99,7 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
         let mut cursor = QueryCursor::new();
         let matches = cursor.matches(&query, tree.root_node(), source_bytes.as_slice());
         matches.for_each(|matched| {
-            process_match(&language, &source_bytes, &matcher, &matched);
+            process_match(&path, &language, &source_bytes, &matcher, &matched);
         });
     }
 
@@ -109,8 +109,9 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
 }
 
 fn process_match(
+    path: &Path,
     language: &Language,
-    sources: &[u8],
+    source_bytes: &[u8],
     matcher: &Matcher,
     matched: &QueryMatch,
 ) -> Option<Interesting> {
@@ -118,12 +119,14 @@ fn process_match(
         return None;
     };
 
+    let file_path = path.to_string_lossy();
+
     // Identifier: Extract a string
     // FIXME Need to hand back a string, which could possibly be a constant value like the filename or empty string.
     let identifier_text = match &matcher.identifier {
         MatchType::Match => {
             let range = root_match.node.start_byte()..root_match.node.end_byte();
-            let text = String::from_utf8_lossy(&sources[range]);
+            let text = String::from_utf8_lossy(&source_bytes[range]);
             Some(text)
         }
         MatchType::Kind(_kind, _index) => {
@@ -134,7 +137,7 @@ fn process_match(
             let child = root_match.node.child_by_field_name(child_name);
             if let Some(node) = child {
                 let range = node.start_byte()..node.end_byte();
-                let text = String::from_utf8_lossy(&sources[range]);
+                let text = String::from_utf8_lossy(&source_bytes[range]);
                 Some(text)
             } else {
                 None
@@ -147,9 +150,13 @@ fn process_match(
             todo!("Return results of sub-query")
         }
         MatchType::Static(text) => Some(Cow::from(text)),
-        MatchType::Variable(_var_name) => {
-            // Merge with Static, use some kind of interpolated string?
-            todo!("Substitute a variable name, or fail if it's unknown")
+        MatchType::Variable(var_name) => {
+            if var_name == "${file_name}" {
+                Some(Cow::from(file_path.to_string()))
+            } else {
+                // Merge with Static, use some kind of interpolated string?
+                todo!("Fail on unknown variable")
+            }
         }
     };
 
@@ -158,24 +165,23 @@ fn process_match(
         return None;
     };
 
-    // TODO Get matched bytes, then convert to string for identifiers
+    // TODO Get matched bytes, then convert to string for identifiers?
     // Contents
     let body_bytes = match &matcher.contents {
         MatchType::Match => {
             let range = root_match.node.start_byte()..root_match.node.end_byte();
-            let bytes = &sources[range];
+            let bytes = &source_bytes[range];
             Some(bytes)
         }
-        MatchType::Kind(kind, _index) => {
-            let query_string = format!("(({}) @kind)", kind);
-            let _query = Query::new(*language, query_string.as_str()).expect("Query for kind");
+        MatchType::Kind(_kind, _index) => {
+            // Iterate over all children for anything matching type, and pick index.
             todo!("Build query for subtype")
         }
         MatchType::Named(child_name) => {
             let child_node = root_match.node.child_by_field_name(child_name);
             if let Some(node) = child_node {
                 let range = node.start_byte()..node.end_byte();
-                let bytes = &sources[range];
+                let bytes = &source_bytes[range];
                 Some(bytes)
             } else {
                 None
@@ -189,10 +195,10 @@ fn process_match(
         MatchType::Static(text) => Some(text.as_bytes()),
         MatchType::Variable(var_name) => {
             if var_name == "${file_name}" {
-                Some("FILE-NAME-HERE".as_bytes())
+                Some(file_path.as_bytes())
             } else {
                 // Merge with Static, use some kind of interpolated string?
-                todo!("Substitute a variable name, or fail if it's unknown")
+                todo!("Fail on unknown variable")
             }
         }
     };
