@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum SupportedLanguage {
     Rust,
@@ -94,6 +95,11 @@ pub struct Watched {
 
     pub notes: Option<String>,
     // TODO Optional checksum to avoid lookup?
+}
+
+pub enum Query {
+    TreeSitter(String),
+    Constant,
 }
 
 /// Build list of items that should be matched for Rust.
