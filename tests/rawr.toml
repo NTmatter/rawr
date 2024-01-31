@@ -1,0 +1,81 @@
+[rawr]
+description = "Figure out what the config file should look like."
+
+# Define matches. These should probably be externalized via some kind of include
+# system.
+
+# Effectively a project structure
+[codebase.self]
+description = 'This codebase'
+
+# Multiple source modules can be defined for this codebase.
+[[sources]]
+description = 'The primary Rust codebase'
+
+# Defaults for the codebase.
+language = 'rust'
+
+# Optional. Shorthand for the first rule. Anything more complex should be added
+# to the array of rules below.
+# Root is implicitly project root, or should it be CWD?
+glob = './src/**.rs'
+
+# This will probably start to look like rsync's syntax.
+# Pairs of include/exclude to specify what to bring in, then exceptions to that
+# rule.
+[[sources.rule]]
+language = 'rust'
+# root = 'src' # Should root be implicit?
+include = '**/*.rs'
+exclude = '**/example.rs'
+
+[[sources.rule]]
+include = './test/**/*.rs'
+
+
+[codebase.upstream]
+description = "This is what we're reimplementing."
+
+language = 'java'
+glob = '../upstream/**/*.java'
+
+
+# Language definitions should live in their own files, included by default or
+# with an include statement.
+# DESIGN Included languages should be merged. How do we handle conflicts? Rename?
+# DESIGN How do we handle multiple languages in one file? Just make them nested tables.
+[language]
+# includes = ['whitespace.toml']
+
+# [language.java]
+# Should be made available under its canonical name.
+# include_builtin = "java"
+
+# Allow custom languages to be defined inline.
+[language.rust]
+description = 'Rust support (WIP)'
+
+[language.rust.matcher.function]
+
+
+# Inline definitions are permissible.
+[language.bash]
+description = 'Rudimentary bash files'
+extensions = ['*.sh'] # Should this be handled by the glob? Overridden?
+
+[language.bash.matcher.file]
+# kind = 'file' # Push this up into the key name.
+query = '((source_file) @f)'
+identifier = 'String("${file_name}")'
+contents = 'Match'
+
+# When merging, explicitly delete keys to get rid of them.
+[language.bash.matcher.comment]
+delete = true
+
+[language.bash.matcher.function]
+kind = 'function'
+
+[[matcher]]
+kind = 'variable'
+
