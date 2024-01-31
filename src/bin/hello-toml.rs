@@ -7,11 +7,10 @@ use anyhow::bail;
 use regex::Regex;
 use serde::de;
 use serde::{Deserialize, Deserializer};
-use std::cell::OnceCell;
 use std::fs::File;
 use std::io::Read;
 use std::str::FromStr;
-use toml::{self, Table};
+use toml::{self, Table, Value};
 
 fn main() -> anyhow::Result<()> {
     let mut args = std::env::args();
@@ -27,12 +26,17 @@ fn main() -> anyhow::Result<()> {
     // Parse without Serde
     let _config = contents.parse::<Table>()?;
 
+    // Can we parse a bare TOML array
+    let array_string = r#"arr = [ 1, "two" ]"#;
+    let arr = array_string.parse::<Table>()?;
+    let arr = arr.get("arr").unwrap();
+
     // language=toml
     let inline = r#"
     [rawr]
-    description = "This is a plain string"
+    description = 'This is a plain string'
     # Looks like this needs a custom deserializer
-    foo = 'D("foo", 12)'
+    foo = 'D(12, "foo")'
     "#;
 
     let config: Config = toml::from_str(inline)?;
@@ -51,7 +55,7 @@ pub enum Foo {
     A,
     B { count: u64 },
     C(String),
-    D(u64, String),
+    D(i64, String),
 }
 
 // Starting to build a lightly-customized deserializer.
@@ -86,7 +90,7 @@ impl<'de> Deserialize<'de> for Foo {
                 return Ok(Foo::A);
             }
             "B" => {
-                if !bracketed_args.is_none() || args.is_none() {
+                if bracketed_args.is_none() || args.is_none() {
                     return Err(de::Error::missing_field("count"));
                 }
 
@@ -98,7 +102,34 @@ impl<'de> Deserialize<'de> for Foo {
                 return Ok(Foo::B { count });
             }
             "C" => todo!("Parse variant C"),
-            "D" => todo!("Parse variant D"),
+            "D" => {
+                if bracketed_args.is_none() || args.is_none() {
+                    return Err(de::Error::missing_field("count"));
+                }
+
+                // Cheat a little by using the built-in deserializer.
+                let args = args.unwrap().as_str();
+                let args = format!("args = [{}]", args);
+                let Ok(args) = args.parse::<Table>() else {
+                    return Err(de::Error::custom("Failed to parse list of args"));
+                };
+
+                let Some(Value::Array(args)) = args.get("args") else {
+                    return Err(de::Error::custom("Failed to extract args"));
+                };
+
+                // TODO Rewrite to allow invalid_value variant
+                // TODO Ensure positive.
+                let Some(Value::Integer(foo_count)) = args.get(0) else {
+                    return Err(de::Error::custom("Did not get an int"));
+                };
+
+                let Some(Value::String(foo_description)) = args.get(1) else {
+                    return Err(de::Error::custom("Did not get a string"));
+                };
+
+                return Ok(Foo::D(*foo_count, foo_description.to_string()));
+            }
             unknown @ _ => {
                 return Err(de::Error::unknown_variant(
                     unknown,
