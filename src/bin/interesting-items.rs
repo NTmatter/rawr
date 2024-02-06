@@ -8,13 +8,13 @@
 
 use anyhow::bail;
 use sha2::{Digest, Sha256};
-use std::any::Any;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 
-use rawr::{Interesting, MatchType, Matcher, SupportedLanguage};
+use rawr::lang::{MatchType, Matcher, SupportedLanguage};
+use rawr::Interesting;
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
 use tree_sitter_bash;
 use tree_sitter_c;
@@ -24,8 +24,8 @@ use tree_sitter_rust;
 fn main() -> anyhow::Result<()> {
     // Build matchers for supported languages
     let mut language_matchers = HashMap::<SupportedLanguage, Vec<Matcher>>::new();
-    language_matchers.insert(SupportedLanguage::Rust, rawr::matchers_rust());
-    language_matchers.insert(SupportedLanguage::Bash, rawr::matchers_bash());
+    language_matchers.insert(SupportedLanguage::Rust, rawr::lang::matchers_rust());
+    language_matchers.insert(SupportedLanguage::Bash, rawr::lang::matchers_bash());
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
@@ -60,8 +60,8 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     println!("Searching for matches in {}", path.display());
 
     let (language, matchers) = match lang {
-        SupportedLanguage::Rust => (tree_sitter_rust::language(), rawr::matchers_rust()),
-        SupportedLanguage::Bash => (tree_sitter_bash::language(), rawr::matchers_bash()),
+        SupportedLanguage::Rust => (tree_sitter_rust::language(), rawr::lang::matchers_rust()),
+        SupportedLanguage::Bash => (tree_sitter_bash::language(), rawr::lang::matchers_bash()),
         SupportedLanguage::C => todo!(),
         SupportedLanguage::Cpp => todo!(),
     };
@@ -152,20 +152,13 @@ fn process_match(
                 None
             }
         }
-        MatchType::Query(query_string, _match_id) => {
-            let _query =
-                Query::new(*language, query_string.as_str()).expect("Parse identifier query");
+        MatchType::Query(_match_id, query_string) => {
+            let _query = Query::new(*language, query_string).expect("Parse identifier query");
             let mut _cursor = QueryCursor::new();
             todo!("Return results of sub-query")
         }
-        MatchType::Static(text) => Some(Cow::from(text)),
-        MatchType::Variable(var_name) => {
-            if var_name == "${file_name}" {
-                Some(Cow::from(file_path.to_string()))
-            } else {
-                // Merge with Static, use some kind of interpolated string?
-                todo!("Fail on unknown variable")
-            }
+        MatchType::Format(text) => {
+            Some(Cow::from(text.replace("${file_name}", file_path.as_ref())))
         }
     };
 
@@ -176,14 +169,16 @@ fn process_match(
 
     // TODO Get matched bytes, then convert to string for identifiers?
     // TODO Try to capture start and length
+    // DESIGN Rewrite all arms to fill a buf.
     // Contents
+    let mut buf = Vec::<u8>::new();
     let body_bytes = match &matcher.contents {
         MatchType::Match => {
             let range = root_match.node.start_byte()..root_match.node.end_byte();
             let bytes = &source_bytes[range];
             Some(bytes)
         }
-        MatchType::Kind(_kind, _index) => {
+        MatchType::Kind(_index, _kind) => {
             // Iterate over all children for anything matching type, and pick index.
             todo!("Build query for subtype")
         }
@@ -197,19 +192,16 @@ fn process_match(
                 None
             }
         }
-        MatchType::Query(query_string, _match_id) => {
+        MatchType::Query(_match_id, query_string) => {
             let _query = Query::new(*language, query_string.as_str()).expect("Parse matcher query");
             let mut _cursor = QueryCursor::new();
             todo!("Return results of sub-query")
         }
-        MatchType::Static(text) => Some(text.as_bytes()),
-        MatchType::Variable(var_name) => {
-            if var_name == "${file_name}" {
-                Some(file_path.as_bytes())
-            } else {
-                // Merge with Static, use some kind of interpolated string?
-                todo!("Fail on unknown variable")
-            }
+        MatchType::Format(text) => {
+            let replaced = text.replace("${file_name}", file_path.as_ref());
+            let bytes = replaced.as_bytes();
+            buf.copy_from_slice(bytes);
+            Some(buf.as_slice())
         }
     };
 
