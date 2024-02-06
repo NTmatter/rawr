@@ -6,8 +6,6 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-mod rawr_lib;
-
 use anyhow::bail;
 use sha2::{Digest, Sha256};
 use std::any::Any;
@@ -16,7 +14,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::Path;
 
-use rawr_lib::{Interesting, MatchType, Matcher, SupportedLanguage};
+use rawr::{Interesting, MatchType, Matcher, SupportedLanguage};
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
 use tree_sitter_bash;
 use tree_sitter_c;
@@ -26,8 +24,8 @@ use tree_sitter_rust;
 fn main() -> anyhow::Result<()> {
     // Build matchers for supported languages
     let mut language_matchers = HashMap::<SupportedLanguage, Vec<Matcher>>::new();
-    language_matchers.insert(SupportedLanguage::Rust, rawr_lib::matchers_rust());
-    language_matchers.insert(SupportedLanguage::Bash, rawr_lib::matchers_bash());
+    language_matchers.insert(SupportedLanguage::Rust, rawr::matchers_rust());
+    language_matchers.insert(SupportedLanguage::Bash, rawr::matchers_bash());
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
@@ -62,8 +60,8 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     println!("Searching for matches in {}", path.display());
 
     let (language, matchers) = match lang {
-        SupportedLanguage::Rust => (tree_sitter_rust::language(), rawr_lib::matchers_rust()),
-        SupportedLanguage::Bash => (tree_sitter_bash::language(), rawr_lib::matchers_bash()),
+        SupportedLanguage::Rust => (tree_sitter_rust::language(), rawr::matchers_rust()),
+        SupportedLanguage::Bash => (tree_sitter_bash::language(), rawr::matchers_bash()),
         SupportedLanguage::C => todo!(),
         SupportedLanguage::Cpp => todo!(),
     };
