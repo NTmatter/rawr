@@ -2,7 +2,7 @@
 
 #![allow(unused)]
 
-use rawr::rawr;
+use rawr_attribute::rawr;
 // use rawr_addributes::rawr;
 // use rawr::rawr_body;
 

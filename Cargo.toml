@@ -1,16 +1,11 @@
 [package]
 name = "rawr"
-description = "Reimplement And Watch Revisions, by mapping between codebases and highlighting when upstream changes affect the existing implementation."
+description = "Reimplement And Watch Revisions by mapping between codebases and highlighting when upstream changes affect the existing implementation."
 authors = ["Thomas Johnson <NTmatter@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
 publish = false
-license = "MIT AND Apache-2.0"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-proc-macro = true
+license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.79"
@@ -19,8 +14,8 @@ rand = "0.8.5"
 rusqlite = { version = "0.30.0", features = ["bundled"] }
 sha2 = "0.10.8"
 toml = { version = "0.8.8", features = ["parse"] }
-#syn = "2.0.46"
-#quote = "1.0.35"
+
+# TreeSitter and language support
 tree-sitter = "0.20.10"
 tree-sitter-bash = "0.20.3"
 tree-sitter-c = "0.20.6"
@@ -28,12 +23,12 @@ tree-sitter-cpp = "0.20.3"
 tree-sitter-rust = "0.20.4"
 
 tree-sitter-traversal = "0.1.2"
+
 serde = { version = "1.0.195", features = ["derive"] }
 regex = "1.10.3"
 
 [dev-dependencies]
-serde = { version = "1.0.195", features = ["derive"] }
-regex = "1.10.3"
+rawr_attribute = { git = "ssh://git@github.com/NTmatter/rawr_attribute.git" }
 
 [build-dependencies]
 cc="*"
