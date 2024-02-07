@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use regex::Regex;
+use serde::de;
+use serde::de::Deserialize;
+use serde::Deserializer;
+use std::cell::OnceCell;
+use std::sync::OnceLock;
+
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum SupportedLanguage {
     Rust,
@@ -14,14 +21,68 @@ pub enum SupportedLanguage {
 pub enum MatchType {
     /// Reuse the entire match
     Match,
-    /// A named type from the grammar
-    Kind(usize, String),
-    /// Nth Named child to extract as text.
+    /// Named child to extract as text.
     Named(String),
+    /// The nth child of the grammar's given type.
+    Kind(usize, String),
+    /// Use a formatted string in place of a match. The only supported
+    /// substitution is `${file_name}`, however this will likely be switched to
+    /// a templating system.
+    String(String),
     /// Tree-Sitter query and nth-match from which to extract text.
-    Query(usize, String),
-    /// Use a fixed string in place of a match.
-    Format(String),
+    SubQuery(usize, String),
+}
+
+/// Deserialize a string containing a MatchType variant.
+impl<'de> Deserialize<'de> for MatchType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize as whole string
+        let s = String::deserialize(deserializer)?;
+
+        // The Match type doesn't take any options. Return if it is specified.
+        if s == "Match" {
+            return Ok(MatchType::Match);
+        }
+
+        static VARIANT_REGEX: OnceLock<Regex> = OnceLock::new();
+        let variant_regex = VARIANT_REGEX.get_or_init(|| {
+            Regex::new(r"^(?P<variant>[[:alnum:]]+)(?P<bracketed_args>\((?P<args>.+?)\))?$")
+                .unwrap()
+        });
+
+        let Some(matches) = variant_regex.captures(&s) else {
+            return Err(de::Error::custom(
+                // TODO Usage example
+                "Invalid format. Expected a variant of MatchType.",
+            ));
+        };
+
+        let Some(variant) = matches.name("variant") else {
+            return Err(de::Error::unknown_variant(
+                "",
+                ["Match", "Named", "Kind", "String", "SubQuery"].as_ref(),
+            ));
+        };
+
+        match variant.as_str() {
+            "Match" => unreachable!("Match was handled early in the function"),
+            "Named" => todo!(),    // String
+            "String" => todo!(),   // String
+            "Kind" => todo!(),     // usize, String
+            "SubQuery" => todo!(), // usize, String
+            _ => {
+                return Err(de::Error::unknown_variant(
+                    "",
+                    &["Match", "Named", "Kind", "String", "SubQuery"],
+                ))
+            }
+        }
+
+        todo!()
+    }
 }
 
 /// Assumes that the interesting parts are actually named in the Tree-Sitter
@@ -31,7 +92,7 @@ pub struct Matcher {
     /// Friendly name for matches
     pub kind: String,
     /// Tree-Sitter query to match items of this type
-    // TODO Convert over to MatchType?
+    // DESIGN Convert to MatchType?
     pub query: String,
     /// Name of field containing item.
     pub identifier: MatchType,
@@ -53,7 +114,7 @@ pub fn matchers_rust() -> Vec<Matcher> {
         Matcher {
             kind: "file".to_string(),
             query: "((source_file) @f)".to_string(),
-            identifier: Format("${file_name}".to_string()),
+            identifier: String("${file_name}".to_string()),
             contents: Match,
             notes: Some("Exact contents of entire file".to_string()),
         },

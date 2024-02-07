@@ -152,12 +152,12 @@ fn process_match(
                 None
             }
         }
-        MatchType::Query(_match_id, query_string) => {
+        MatchType::SubQuery(_match_id, query_string) => {
             let _query = Query::new(*language, query_string).expect("Parse identifier query");
             let mut _cursor = QueryCursor::new();
             todo!("Return results of sub-query")
         }
-        MatchType::Format(text) => {
+        MatchType::String(text) => {
             Some(Cow::from(text.replace("${file_name}", file_path.as_ref())))
         }
     };
@@ -192,12 +192,12 @@ fn process_match(
                 None
             }
         }
-        MatchType::Query(_match_id, query_string) => {
+        MatchType::SubQuery(_match_id, query_string) => {
             let _query = Query::new(*language, query_string.as_str()).expect("Parse matcher query");
             let mut _cursor = QueryCursor::new();
             todo!("Return results of sub-query")
         }
-        MatchType::Format(text) => {
+        MatchType::String(text) => {
             let replaced = text.replace("${file_name}", file_path.as_ref());
             let bytes = replaced.as_bytes();
             buf.copy_from_slice(bytes);
