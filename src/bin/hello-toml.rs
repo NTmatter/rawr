@@ -58,6 +58,8 @@ pub enum Foo {
     D(i64, String),
 }
 
+// TODO Try to reimplement parser with serde_tokenstream https://github.com/oxidecomputer/serde_tokenstream
+
 // Starting to build a lightly-customized deserializer.
 // see: https://github.com/serde-rs/serde/issues/2086
 impl<'de> Deserialize<'de> for Foo {
