@@ -74,7 +74,7 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     // Parse file
     let mut parser = Parser::new();
     parser
-        .set_language(language)
+        .set_language(&language)
         .expect("Create language parser");
 
     let tree = parser
@@ -85,7 +85,7 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     let mut interesting_matches = Vec::<Interesting>::new();
     for matcher in &matchers {
         // Find matches and extract information
-        let query = match Query::new(language, matcher.query.as_str()) {
+        let query = match Query::new(&language, matcher.query.as_str()) {
             Ok(query) => query,
             Err(e) => {
                 eprintln!("Skipping unparseable query {}", matcher.query);
@@ -153,7 +153,7 @@ fn process_match(
             }
         }
         MatchType::SubQuery(_match_id, query_string) => {
-            let _query = Query::new(*language, query_string).expect("Parse identifier query");
+            let _query = Query::new(language, query_string).expect("Parse identifier query");
             let mut _cursor = QueryCursor::new();
             todo!("Return results of sub-query")
         }
@@ -193,7 +193,7 @@ fn process_match(
             }
         }
         MatchType::SubQuery(_match_id, query_string) => {
-            let _query = Query::new(*language, query_string.as_str()).expect("Parse matcher query");
+            let _query = Query::new(language, query_string.as_str()).expect("Parse matcher query");
             let mut _cursor = QueryCursor::new();
             todo!("Return results of sub-query")
         }
