@@ -4,7 +4,6 @@ use regex::Regex;
 use serde::de;
 use serde::de::Deserialize;
 use serde::Deserializer;
-use std::cell::OnceCell;
 use std::sync::OnceLock;
 
 #[derive(Debug, Eq, PartialEq, Hash)]

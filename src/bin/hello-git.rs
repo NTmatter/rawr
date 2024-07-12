@@ -68,7 +68,7 @@ fn main() -> anyhow::Result<()> {
 
     // The raw bytes can be passed directly to Tree-Sitter.
     let mut parser = Parser::new();
-    parser.set_language(tree_sitter_bash::language())?;
+    parser.set_language(&tree_sitter_bash::language())?;
     let _tree = parser.parse(file_data, None).unwrap();
 
     println!("Successfully parsed tree");

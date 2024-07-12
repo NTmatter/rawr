@@ -8,8 +8,6 @@ use std::io::{self, ErrorKind, Read};
 use tree_sitter::{self, Parser, Query, QueryCursor, Tree};
 use tree_sitter_bash;
 use tree_sitter_rust;
-use tree_sitter_traversal as tst;
-use tree_sitter_traversal::Order;
 
 /// Tree-Sitter query for RAWR annotations attached to various declarations
 // FIXME Only accepts last few rawr attributes. Consider post-filter?
@@ -59,7 +57,7 @@ fn parse_bash(source_file: &String) {
     println!("--- Bash ---");
     let mut parser = Parser::new();
     parser
-        .set_language(tree_sitter_bash::language())
+        .set_language(&tree_sitter_bash::language())
         .expect("Create Bash parser");
 
     let mut source_file = File::open(source_file).expect("Open upstream file");
@@ -72,11 +70,6 @@ fn parse_bash(source_file: &String) {
         .parse(&source_bytes.as_slice(), None)
         .expect("Parse upstream file");
 
-    let cur = tst::traverse_tree(&tree, Order::Pre);
-    for node in cur {
-        println!("Node: {:?} named: {}", node, node.is_named());
-    }
-
     // Find variable FOO
     let query = "(variable_assignment (variable_name) @var \"=\" (_) @body (#eq? @var \"FOO\"))";
     print_matches(query, &source_bytes, &tree);
@@ -88,7 +81,7 @@ fn parse_bash(source_file: &String) {
 }
 
 fn print_matches(query_string: &str, source_bytes: &Vec<u8>, tree: &Tree) {
-    let query = Query::new(tree.language(), query_string).expect("Create query");
+    let query = Query::new(&tree.language(), query_string).expect("Create query");
     let mut query_cursor = QueryCursor::new();
     let matches = query_cursor.matches(&query, tree.root_node(), source_bytes.as_slice());
     matches.for_each(|m| {
@@ -175,7 +168,7 @@ fn parse_annotations(source_file: &String) {
     // see: https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_rust
     let mut parser = Parser::new();
     parser
-        .set_language(tree_sitter_rust::language())
+        .set_language(&tree_sitter_rust::language())
         .expect("Create Rust parser");
     let mut source_file = File::open(source_file).expect("Open test file");
     let mut source_bytes = Vec::new();
@@ -187,11 +180,6 @@ fn parse_annotations(source_file: &String) {
     let tree = parser
         .parse(&source_bytes.as_slice(), None)
         .expect("Parse test file");
-
-    let cur = tst::traverse_tree(&tree, Order::Pre);
-    for node in cur {
-        println!("Node of type {} named: {}", node.kind(), node.is_named());
-    }
 
     // see https://deepsource.com/blog/lightweight-linting
     println!("--- Matches ---");
