@@ -49,7 +49,10 @@ struct Args {
 }
 
 fn main() -> Result<(), io::Error> {
-    let Args { rust_file: implementation_file, bash_file: upstream_file } = Args::parse();
+    let Args {
+        rust_file: implementation_file,
+        bash_file: upstream_file,
+    } = Args::parse();
 
     parse_annotations(implementation_file);
     parse_bash(upstream_file);

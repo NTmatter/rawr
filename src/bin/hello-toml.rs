@@ -10,8 +10,8 @@ use std::str::FromStr;
 
 use clap::Parser as ClapParser;
 use regex::Regex;
-use serde::{Deserialize, Deserializer};
 use serde::de;
+use serde::{Deserialize, Deserializer};
 use toml::{self, Table, Value};
 
 #[derive(ClapParser, Debug)]
@@ -22,7 +22,7 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     let Args { toml_file: path } = Args::parse();
-    
+
     let mut file = File::open(path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;

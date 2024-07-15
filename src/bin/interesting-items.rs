@@ -7,14 +7,14 @@
 #![allow(unused_imports)]
 
 use anyhow::bail;
+use clap::Parser as ClapParser;
+use rawr::lang::{MatchType, Matcher, SupportedLanguage};
+use rawr::Interesting;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use clap::Parser as ClapParser;
-use rawr::lang::{MatchType, Matcher, SupportedLanguage};
-use rawr::Interesting;
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
 use tree_sitter_bash;
 use tree_sitter_c;
@@ -218,18 +218,26 @@ fn process_match(
     let hash_algorithm = "sha256".to_string();
     let mut hasher = Sha256::new();
 
-    let salt: u64 = rand::random();
-    hasher.update(salt.to_be_bytes());
+    // Consider salting the hash. This will prevent simple lookup.
+    // let salt: Option<u64> = Some(rand::random());
+    let salt: Option<u64> = None;
+    if let Some(salt) = salt {
+        hasher.update(salt.to_be_bytes());
+    }
+
     hasher.update(contents);
 
     let hash = format!("{:02x}", Sha256::digest(contents));
+
+    let start_byte = root_match.node.start_byte();
+    let length = root_match.node.end_byte() - root_match.node.start_byte();
 
     Some(Interesting {
         codebase: codebase.to_string(),
         revision: revision.to_string(),
         path: file_path.to_string(),
-        start_byte: None,
-        length: None,
+        start_byte,
+        length,
         kind: matcher.kind.to_string(),
         identifier: identifier.to_string(),
         hash_algorithm,
