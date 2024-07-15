@@ -3,22 +3,26 @@
 //! Parse the basic config toml. The `toml` crate seems to pull in serde.
 //! Follow along with https://www.makeuseof.com/working-with-toml-files-in-rust/
 
-use anyhow::bail;
-use regex::Regex;
-use serde::de;
-use serde::{Deserialize, Deserializer};
 use std::fs::File;
 use std::io::Read;
+use std::path::PathBuf;
 use std::str::FromStr;
+
+use clap::Parser as ClapParser;
+use regex::Regex;
+use serde::{Deserialize, Deserializer};
+use serde::de;
 use toml::{self, Table, Value};
 
-fn main() -> anyhow::Result<()> {
-    let mut args = std::env::args();
-    if args.len() != 2 {
-        bail!("Usage: hello-toml FILE.toml");
-    }
+#[derive(ClapParser, Debug)]
+struct Args {
+    #[arg()]
+    toml_file: PathBuf,
+}
 
-    let path = args.nth(1).unwrap();
+fn main() -> anyhow::Result<()> {
+    let Args { toml_file: path } = Args::parse();
+    
     let mut file = File::open(path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;

@@ -9,6 +9,7 @@ license = "Apache-2.0"
 
 [dependencies]
 anyhow = "1.0.79"
+clap = { version = "4.5.9", features = ["derive"] }
 gix = "0.63.0"
 rand = "0.8.5"
 rusqlite = { version = "0.31.0", features = ["bundled"] }

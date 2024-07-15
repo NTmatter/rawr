@@ -11,8 +11,8 @@ use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Read;
-use std::path::Path;
-
+use std::path::{Path, PathBuf};
+use clap::Parser as ClapParser;
 use rawr::lang::{MatchType, Matcher, SupportedLanguage};
 use rawr::Interesting;
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
@@ -21,19 +21,23 @@ use tree_sitter_c;
 use tree_sitter_cpp;
 use tree_sitter_rust;
 
+#[derive(ClapParser, Debug)]
+struct Args {
+    /// List of files to search
+    #[arg(required = true)]
+    files: Vec<PathBuf>,
+}
+
 fn main() -> anyhow::Result<()> {
+    let args = Args::parse();
+
     // Build matchers for supported languages
     let mut language_matchers = HashMap::<SupportedLanguage, Vec<Matcher>>::new();
     language_matchers.insert(SupportedLanguage::Rust, rawr::lang::matchers_rust());
     language_matchers.insert(SupportedLanguage::Bash, rawr::lang::matchers_bash());
 
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
-        bail!("File names must be specified");
-    }
-
     // Process known filetypes
-    args.into_iter().skip(1).for_each(|arg| {
+    args.files.into_iter().for_each(|arg| {
         let path = Path::new(&arg);
 
         let Some(file_extension) = path.extension() else {

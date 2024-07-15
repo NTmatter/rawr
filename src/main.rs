@@ -2,9 +2,11 @@
 
 #![allow(dead_code)]
 use std::collections::HashMap;
-use std::env::args;
 use std::fs::File;
-use std::io::{self, ErrorKind, Read};
+use std::io::{self, Read};
+use std::path::PathBuf;
+
+use clap::Parser as ClapParser;
 use tree_sitter::{self, Parser, Query, QueryCursor, Tree};
 use tree_sitter_bash;
 use tree_sitter_rust;
@@ -37,23 +39,24 @@ const ANNOTATION_ATTRIBUTE_QUERY: &str = "
 (arguments: (token_tree ((identifier) @key . \"=\" . (_literal) @val)* @pair))
 ";
 
+#[derive(ClapParser, Debug)]
+struct Args {
+    #[arg(required = true)]
+    rust_file: PathBuf,
+
+    #[arg(required = true)]
+    bash_file: PathBuf,
+}
+
 fn main() -> Result<(), io::Error> {
-    let args: Vec<String> = args().collect();
-    if args.len() < 3 {
-        return Err(io::Error::new(
-            ErrorKind::InvalidInput,
-            "Usage: rawr rust_file bash_file",
-        ));
-    }
-    let implementation_file = args.get(1).unwrap();
-    let upstream_file = args.get(2).unwrap();
+    let Args { rust_file: implementation_file, bash_file: upstream_file } = Args::parse();
 
     parse_annotations(implementation_file);
     parse_bash(upstream_file);
     Ok(())
 }
 
-fn parse_bash(source_file: &String) {
+fn parse_bash(source_file: PathBuf) {
     println!("--- Bash ---");
     let mut parser = Parser::new();
     parser
@@ -162,7 +165,7 @@ fn print_matches(query_string: &str, source_bytes: &Vec<u8>, tree: &Tree) {
     });
 }
 
-fn parse_annotations(source_file: &String) {
+fn parse_annotations(source_file: PathBuf) {
     // TODO Iterate over all paths in all codebases.
 
     // see: https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_rust
