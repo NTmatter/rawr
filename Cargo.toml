@@ -1,6 +1,6 @@
 [package]
 name = "rawr"
-description = "Reimplement And Watch Revisions by mapping between codebases and highlighting when upstream changes affect the existing implementation."
+description = "Reimplement and Watch Revisions by mapping between codebases and highlighting when upstream changes affect the existing implementation."
 authors = ["Thomas Johnson <NTmatter@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
@@ -8,7 +8,7 @@ publish = false
 license = "Apache-2.0"
 
 [dependencies]
-anyhow = "1.0.79"
+anyhow = "1.0.86"
 clap = { version = "4.5.9", features = ["derive"] }
 gix = "0.63.0"
 rand = "0.8.5"
@@ -21,15 +21,13 @@ tree-sitter = "0.22.6"
 tree-sitter-bash = "0.21.0"
 tree-sitter-c = "0.21.4"
 tree-sitter-cpp = "0.22.2"
-tree-sitter-rust = "0.21.0"
-
-# tree-sitter-traversal = "0.1.2"
+tree-sitter-rust = "0.21.2"
 
 serde = { version = "1.0.204", features = ["derive"] }
 regex = "1.10.5"
 
 [dev-dependencies]
-rawr_attribute = { git = "ssh://git@github.com/NTmatter/rawr_attribute.git" }
+rawr_attribute = { git = "https://github.com/NTmatter/rawr_attribute.git" }
 
 [build-dependencies]
 cc = "*"
