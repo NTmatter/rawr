@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS upstream
 
     -- Optional salt for hash. This will be problematic for lookups.
     -- Store as a u64.
-    salt           INT8,
+    salt           INT,
 
     -- Hash of matched bytes, stored as uppercase hex without leading 0x.
     -- Switch to BLOB for efficiency. Consider first 64 bits of SHA 512?
