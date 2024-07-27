@@ -66,8 +66,6 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     let (language, matchers) = match lang {
         SupportedLanguage::Rust => (tree_sitter_rust::language(), rawr::lang::matchers_rust()),
         SupportedLanguage::Bash => (tree_sitter_bash::language(), rawr::lang::matchers_bash()),
-        SupportedLanguage::C => todo!(),
-        SupportedLanguage::Cpp => todo!(),
     };
 
     // Open and read file

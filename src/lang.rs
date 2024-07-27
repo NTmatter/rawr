@@ -10,8 +10,8 @@ use std::sync::OnceLock;
 pub enum SupportedLanguage {
     Rust,
     Bash,
-    C,
-    Cpp,
+    // C,
+    // Cpp,
 }
 
 /// Extract information with a named match in the Tree-Sitter grammar, or use a
