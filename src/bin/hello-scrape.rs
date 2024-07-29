@@ -80,8 +80,6 @@ fn main() -> anyhow::Result<()> {
             return Result::<(), anyhow::Error>::Ok(());
         };
 
-        // println!("\tMessage: {}", commit.message_raw_sloppy());
-
         // Iterate over files in revision
         let mut recorder = Recorder::default();
         commit
@@ -107,16 +105,23 @@ fn main() -> anyhow::Result<()> {
                 // Temp: Prove that we can get access to the file data.
                 let blob = obj.try_into_blob().context("Convert object to Blob")?;
 
-                let results =
-                    find_matches_in_blob(&entry.filepath, &rev, &blob).unwrap_or(Vec::new());
+                let results = find_matches_in_blob(&entry.filepath, &rev, &blob).unwrap_or(None);
 
-                println!(
-                    "\t\t{} {} {} bytes, {} results",
-                    entry.filepath,
-                    entry.oid,
-                    blob.data.len(),
-                    results.len(),
-                );
+                match results {
+                    Some(ref results) => println!(
+                        "\t\t{} {} {} bytes, {} results",
+                        entry.filepath,
+                        entry.oid,
+                        blob.data.len(),
+                        results.len(),
+                    ),
+                    None => println!(
+                        "\t\t{} {} {} bytes",
+                        entry.filepath,
+                        entry.oid,
+                        blob.data.len()
+                    ),
+                };
 
                 Result::<(), anyhow::Error>::Ok(())
             })?;
@@ -128,7 +133,11 @@ fn main() -> anyhow::Result<()> {
 }
 
 /// Extract interesting features from file.
-fn find_matches_in_blob(path: &BString, rev: &Id, blob: &Blob) -> anyhow::Result<Vec<Interesting>> {
+fn find_matches_in_blob(
+    path: &BString,
+    rev: &Id,
+    blob: &Blob,
+) -> anyhow::Result<Option<Vec<Interesting>>> {
     let path = path.to_string();
     let path = Path::new(&path);
 
@@ -142,7 +151,7 @@ fn find_matches_in_blob(path: &BString, rev: &Id, blob: &Blob) -> anyhow::Result
 
     // Only parse known languages for now.
     let Some(lang) = lang else {
-        return Ok(Vec::new());
+        return Ok(None);
     };
 
     let (language, matchers) = match lang {
@@ -191,7 +200,7 @@ fn find_matches_in_blob(path: &BString, rev: &Id, blob: &Blob) -> anyhow::Result
 
     // These should probably be concatenated for efficiency, but settle for repeated searches. O(matches * files)
     // todo!("Open file, parse, and build list of all matches");
-    Ok(interesting_matches)
+    Ok(Some(interesting_matches))
 }
 
 fn process_match(
