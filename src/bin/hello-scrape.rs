@@ -32,7 +32,7 @@ struct Args {
     repo_path: PathBuf,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 struct MemoKey {
     path: BString,
     object_id: ObjectId,
@@ -58,6 +58,8 @@ fn main() -> anyhow::Result<()> {
 
     let repo = gix::discover(repo_path).context("Repository exists at provided path")?;
     debug!("Repo uses hash type {}", repo.object_hash());
+
+    let mut seen_path_versions: HashMap<MemoKey, Option<Vec<Interesting>>> = HashMap::new();
 
     // TODO Iterate over heads
     let head = heads
@@ -94,33 +96,37 @@ fn main() -> anyhow::Result<()> {
             .filter(|entry| entry.mode.is_blob())
             .try_for_each(|entry| {
                 // Get basic information about entry and retrieve underlying blob.
+                let memo_key = MemoKey {
+                    path: entry.filepath.clone(),
+                    object_id: entry.oid,
+                };
 
-                // Is OID a sha1? If so, this is useful for memoization on parsing files.
-                // file path + oid seems sufficient. Might need a custom key that supports Hash
-                let obj = repo.find_object(entry.oid).context("Find file blob")?;
+                // DESIGN Use the entries API, but how to handle control flow?
+                let cached = seen_path_versions.get(&memo_key);
+                let results = match cached {
+                    None => {
+                        let obj = repo.find_object(entry.oid).context("Find file blob")?;
 
-                // TODO If the entry corresponds to a new (path, oid), parse the file based on its
-                //   extension.
+                        // Temp: Prove that we can get access to the file data.
+                        let blob = obj.try_into_blob().context("Convert object to Blob")?;
 
-                // Temp: Prove that we can get access to the file data.
-                let blob = obj.try_into_blob().context("Convert object to Blob")?;
+                        let results =
+                            find_matches_in_blob(&entry.filepath, &rev, &blob).unwrap_or(None);
 
-                let results = find_matches_in_blob(&entry.filepath, &rev, &blob).unwrap_or(None);
+                        seen_path_versions.insert(memo_key.clone(), results);
+                        seen_path_versions.get(&memo_key).unwrap()
+                    }
+                    Some(results) => results,
+                };
 
                 match results {
                     Some(ref results) => println!(
-                        "\t\t{} {} {} bytes, {} results",
+                        "\t\t{} {} {} results",
                         entry.filepath,
                         entry.oid,
-                        blob.data.len(),
                         results.len(),
                     ),
-                    None => println!(
-                        "\t\t{} {} {} bytes",
-                        entry.filepath,
-                        entry.oid,
-                        blob.data.len()
-                    ),
+                    None => println!("\t\t{} {}", entry.filepath, entry.oid,),
                 };
 
                 Result::<(), anyhow::Error>::Ok(())
