@@ -11,6 +11,7 @@ use gix::traverse::tree::Recorder;
 use gix::{Blob, Id, ObjectId};
 use rawr::lang::{MatchType, Matcher, SupportedLanguage};
 use rawr::Interesting;
+use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -59,9 +60,11 @@ fn main() -> anyhow::Result<()> {
     let repo = gix::discover(repo_path).context("Repository exists at provided path")?;
     debug!("Repo uses hash type {}", repo.object_hash());
 
+    let db = db_connection(db_path)?;
+
     let mut seen_path_versions: HashMap<MemoKey, Option<Vec<Interesting>>> = HashMap::new();
 
-    // TODO Iterate over heads
+    // TODO Iterate over all heads
     let head = heads
         .first()
         .context("At least one head must be specified")?
@@ -333,4 +336,13 @@ fn process_match(
         hash,
         notes: None,
     })
+}
+
+fn db_connection(db_path: PathBuf) -> anyhow::Result<Connection> {
+    let conn = Connection::open(db_path).context("Open or create database")?;
+
+    conn.execute_batch(include_str!("../rawr.sql"))
+        .context("Create tables if needed")?;
+
+    Ok(conn)
 }
