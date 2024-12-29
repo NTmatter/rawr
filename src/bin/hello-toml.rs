@@ -33,7 +33,7 @@ fn main() -> anyhow::Result<()> {
     // Can we parse a bare TOML array
     let array_string = r#"arr = [ 1, "two" ]"#;
     let arr = array_string.parse::<Table>()?;
-    let arr = arr.get("arr").unwrap();
+    let _arr = arr.get("arr").unwrap();
 
     // language=toml
     let inline = r#"
@@ -72,7 +72,7 @@ impl<'de> Deserialize<'de> for Foo {
         D: Deserializer<'de>,
     {
         // TODO Convert to once/static
-        let regex = Regex::new(r"^(?P<variant>A|B|C|D)(?P<bracketed_args>\((?P<args>.+?)\))?$")
+        let regex = Regex::new(r"^(?P<variant>[ABCD])(?P<bracketed_args>\((?P<args>.+?)\))?$")
             .expect("Compile regular expression for Foo variants");
 
         let s = String::deserialize(deserializer)?;

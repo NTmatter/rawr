@@ -57,9 +57,10 @@ fn main() -> anyhow::Result<()> {
     println!("Upstream Script: {:?}", upstream_sh);
 
     // An object can be directly retrieved.
-    let mut buf = Vec::<u8>::new();
     let path = std::path::Path::new("tests/upstream.sh");
-    let tests_upstream = tree.lookup_entry_by_path(path, &mut buf)?.unwrap();
+    let tests_upstream = tree
+        .lookup_entry_by_path(path)?
+        .expect("Known file tests/upstream.sh should exist");
     println!("Upstream Script: {:?}", tests_upstream);
 
     // We can get the raw bytes,
@@ -68,7 +69,7 @@ fn main() -> anyhow::Result<()> {
 
     // The raw bytes can be passed directly to Tree-Sitter.
     let mut parser = Parser::new();
-    parser.set_language(&tree_sitter_bash::language())?;
+    parser.set_language(&tree_sitter_bash::LANGUAGE.into())?;
     let _tree = parser.parse(file_data, None).unwrap();
 
     println!("Successfully parsed tree");

@@ -16,6 +16,7 @@ use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use streaming_iterator::StreamingIterator;
 use tracing::{debug, info};
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
 
@@ -164,9 +165,11 @@ fn find_matches_in_blob(
     };
 
     let (language, matchers) = match lang {
-        SupportedLanguage::Rust => (tree_sitter_rust::language(), rawr::lang::matchers_rust()),
-        SupportedLanguage::Bash => (tree_sitter_bash::language(), rawr::lang::matchers_bash()),
+        SupportedLanguage::Rust => (tree_sitter_rust::LANGUAGE, rawr::lang::matchers_rust()),
+        SupportedLanguage::Bash => (tree_sitter_bash::LANGUAGE, rawr::lang::matchers_bash()),
     };
+
+    let language: Language = language.into();
 
     // Parse file
     let mut parser = Parser::new();
@@ -193,8 +196,8 @@ fn find_matches_in_blob(
 
         let mut cursor = QueryCursor::new();
         let matches = cursor.matches(&query, tree.root_node(), blob.data.as_slice());
-        let processed = matches.filter_map(|matched| {
-            process_match(
+        matches.for_each(|matched| {
+            if let Some(m) = process_match(
                 &"(self)".to_string(),
                 &rev.to_string(),
                 path,
@@ -202,9 +205,10 @@ fn find_matches_in_blob(
                 blob.data.as_slice(),
                 matcher,
                 &matched,
-            )
+            ) {
+                interesting_matches.push(m);
+            }
         });
-        interesting_matches.extend(processed);
     }
 
     // These should probably be concatenated for efficiency, but settle for repeated searches. O(matches * files)

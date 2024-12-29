@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::PathBuf;
+use streaming_iterator::StreamingIterator;
 
 use clap::Parser as ClapParser;
 use tree_sitter::{self, Parser, Query, QueryCursor, Tree};
@@ -63,7 +64,7 @@ fn parse_bash(source_file: PathBuf) {
     println!("--- Bash ---");
     let mut parser = Parser::new();
     parser
-        .set_language(&tree_sitter_bash::language())
+        .set_language(&tree_sitter_bash::LANGUAGE.into())
         .expect("Create Bash parser");
 
     let mut source_file = File::open(source_file).expect("Open upstream file");
@@ -174,7 +175,7 @@ fn parse_annotations(source_file: PathBuf) {
     // see: https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_rust
     let mut parser = Parser::new();
     parser
-        .set_language(&tree_sitter_rust::language())
+        .set_language(&tree_sitter_rust::LANGUAGE.into())
         .expect("Create Rust parser");
     let mut source_file = File::open(source_file).expect("Open test file");
     let mut source_bytes = Vec::new();

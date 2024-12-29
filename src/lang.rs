@@ -79,8 +79,6 @@ impl<'de> Deserialize<'de> for MatchType {
                 ))
             }
         }
-
-        todo!()
     }
 }
 
