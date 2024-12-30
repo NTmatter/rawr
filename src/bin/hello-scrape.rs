@@ -63,7 +63,7 @@ fn main() -> anyhow::Result<()> {
 
     let db = db_connection(db_path)?;
 
-    let mut seen_path_versions: HashMap<MemoKey, Option<Vec<Interesting>>> = HashMap::new();
+    let mut seen_path_versions: HashMap<MemoKey, Vec<Interesting>> = HashMap::new();
 
     // TODO Iterate over all heads
     let head = heads
@@ -106,6 +106,7 @@ fn main() -> anyhow::Result<()> {
                 };
 
                 // DESIGN Use the entries API, but how to handle control flow?
+                // Reuse cached matches if a file has already been processed
                 let cached = seen_path_versions.get(&memo_key);
                 let results = match cached {
                     None => {
@@ -114,8 +115,8 @@ fn main() -> anyhow::Result<()> {
                         // Temp: Prove that we can get access to the file data.
                         let blob = obj.try_into_blob().context("Convert object to Blob")?;
 
-                        let results =
-                            find_matches_in_blob(&entry.filepath, &rev, &blob).unwrap_or(None);
+                        let results = find_matches_in_blob(&entry.filepath, &rev, &blob)
+                            .unwrap_or(Vec::new());
 
                         seen_path_versions.insert(memo_key.clone(), results);
                         seen_path_versions.get(&memo_key).unwrap()
@@ -123,15 +124,21 @@ fn main() -> anyhow::Result<()> {
                     Some(results) => results,
                 };
 
-                match results {
-                    Some(ref results) => println!(
+                if !results.is_empty() {
+                    println!(
                         "\t\t{} {} {} results",
                         entry.filepath,
                         entry.oid,
-                        results.len(),
-                    ),
-                    None => println!("\t\t{} {}", entry.filepath, entry.oid,),
-                };
+                        results.len()
+                    );
+                    results.iter().for_each(|result| {
+                        // TODO Insert into database
+                        println!(
+                            "\t\t\t{}: {} ({} {})",
+                            result.kind, result.identifier, result.hash, result.length
+                        )
+                    });
+                }
 
                 Result::<(), anyhow::Error>::Ok(())
             })?;
@@ -142,12 +149,11 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Extract interesting features from file.
-fn find_matches_in_blob(
-    path: &BString,
-    rev: &Id,
-    blob: &Blob,
-) -> anyhow::Result<Option<Vec<Interesting>>> {
+/// Extract interesting features from file. Automatically guesses file type from
+/// extension, and chooses the corresponding extractor.
+///
+/// TODO Extract language detection and matcher selection. Use file-format or infer crate.
+fn find_matches_in_blob(path: &BString, rev: &Id, blob: &Blob) -> anyhow::Result<Vec<Interesting>> {
     let path = path.to_string();
     let path = Path::new(&path);
 
@@ -161,7 +167,7 @@ fn find_matches_in_blob(
 
     // Only parse known languages for now.
     let Some(lang) = lang else {
-        return Ok(None);
+        return Ok(Vec::new());
     };
 
     let (language, matchers) = match lang {
@@ -213,7 +219,7 @@ fn find_matches_in_blob(
 
     // These should probably be concatenated for efficiency, but settle for repeated searches. O(matches * files)
     // todo!("Open file, parse, and build list of all matches");
-    Ok(Some(interesting_matches))
+    Ok(interesting_matches)
 }
 
 fn process_match(
@@ -321,8 +327,23 @@ fn process_match(
     }
 
     hasher.update(contents);
+    let hash = hasher.finalize();
 
-    let hash = format!("{:02x}", Sha256::digest(contents));
+    let hash = format!("{:02x}", hash);
+
+    // Strip whitespace and generate hash if text is valid utf8.
+    let hash_stripped = String::from_utf8(contents.to_vec())
+        .ok()
+        .map(|s| s.chars().filter(|c| !c.is_whitespace()).collect::<String>())
+        .map(|s| {
+            let mut hasher = Sha256::new();
+            if let Some(salt) = salt {
+                hasher.update(salt.to_be_bytes());
+            }
+            hasher.update(s);
+            let result = hasher.finalize();
+            format!("{:02x}", result)
+        });
 
     let start_byte = root_match.node.start_byte();
     let length = root_match.node.end_byte() - root_match.node.start_byte();
@@ -338,12 +359,15 @@ fn process_match(
         hash_algorithm,
         salt,
         hash,
+        hash_stripped,
         notes: None,
     })
 }
 
 fn db_connection(db_path: PathBuf) -> anyhow::Result<Connection> {
     let conn = Connection::open(db_path).context("Open or create database")?;
+    conn.pragma_update(None, "foreign_keys", "ON")
+        .context("Enable foreign key support")?;
 
     conn.execute_batch(include_str!("../rawr.sql"))
         .context("Create tables if needed")?;

@@ -249,6 +249,7 @@ fn process_match(
         hash_algorithm,
         salt,
         hash,
+        hash_stripped: None,
         notes: None,
     })
 }

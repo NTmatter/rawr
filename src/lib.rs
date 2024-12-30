@@ -11,7 +11,7 @@ pub struct Codebase {
 
 /// Automatically-matched item of interest. These are generally persisted to the
 /// database for tracking movement.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Default, Eq, PartialEq)]
 pub struct Interesting {
     // Location containing match.
     pub codebase: String,
@@ -34,6 +34,9 @@ pub struct Interesting {
     /// Hash of matched data. Matched data is not stored, as it can be retrieved
     /// from the repository.
     pub hash: String,
+
+    /// Hash of matched data with spaces stripped. Optional, in case of binary data.
+    pub hash_stripped: Option<String>,
 
     pub notes: Option<String>,
 }

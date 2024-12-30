@@ -1,13 +1,13 @@
 -- SPDX-License-Identifier: Apache-2.0
 
 -- Table: Upstream Codebase
---
+-- Describes a codebase of interest
 CREATE TABLE IF NOT EXISTS codebase
 (
-    name          TEXT NOT NULL,
+    id            INT  NOT NULL PRIMARY KEY,
+    name          TEXT NOT NULL UNIQUE,
     relative_path TEXT NOT NULL,
-    notes         TEXT,
-    CONSTRAINT PK_codebase PRIMARY KEY (name)
+    notes         TEXT
 ) STRICT;
 
 -- Table: Upstream Items of Interest
@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS codebase
 CREATE TABLE IF NOT EXISTS upstream
 (
     -- Friendly name of upstream codebase.
+    -- Use ID later.
     codebase       TEXT    NOT NULL,
 
     -- Treeish of revision, expecting SHA1, may be anything.
@@ -40,12 +41,17 @@ CREATE TABLE IF NOT EXISTS upstream
     hash_algorithm TEXT    NOT NULL,
 
     -- Optional salt for hash. This will be problematic for lookups.
-    -- Store as a u64.
+    -- Store as u64.
     salt           INT,
 
     -- Hash of matched bytes, stored as uppercase hex without leading 0x.
     -- Switch to BLOB for efficiency. Consider first 64 bits of SHA 512?
     hash           TEXT    NOT NULL,
+
+    -- Hash of matched bytes, after attempting to convert to valid UTF-8
+    -- and stripping Unicode whitespace. This should aid in matching after
+    -- reformatting.
+    hash_stripped  TEXT,
 
     -- Optional notes regarding item.
     notes          TEXT
@@ -62,5 +68,5 @@ CREATE INDEX IF NOT EXISTS IX_upstream ON upstream (codebase, path, identifier, 
 -- Index: Hash Lookup
 -- Expect for lookups by hash, looking for duplicates by type, varying identifier,
 -- and across codebases.
-CREATE INDEX IF NOT EXISTS IX_upstream_hash ON upstream (hash, kind, identifier, codebase)
+CREATE INDEX IF NOT EXISTS IX_upstream_hash ON upstream (codebase, hash, kind, identifier)
     WHERE hash IS NOT NULL;
