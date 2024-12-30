@@ -8,7 +8,7 @@ use anyhow::Context;
 use clap::Parser as ClapParser;
 use gix::bstr::BString;
 use gix::traverse::tree::Recorder;
-use gix::{Blob, ObjectId, Repository};
+use gix::{Blob, Id, ObjectId, Repository};
 use rawr::lang::{MatchType, Matcher, SupportedLanguage};
 use rawr::{db_connection, Interesting};
 use rusqlite::Connection;
@@ -90,6 +90,7 @@ fn process_head(
         .context("Walk all ancestor revisions")?;
     ancestors.try_for_each(|info| {
         let info = info?;
+        let revision = info.id();
         debug!("Processing revision: {}", info.id());
 
         let Ok(commit) = info.object() else {
@@ -111,13 +112,14 @@ fn process_head(
             .filter(|entry| entry.mode.is_blob())
             .try_for_each(|entry| {
                 // Get basic information about entry and retrieve underlying blob.
+                // NOTE Retrieved objects have a baked-in revision.
                 let memo_key = MemoKey {
                     path: entry.filepath.clone(),
                     object_id: entry.oid,
                 };
 
                 // DESIGN Use the entries API, but how to handle control flow?
-                // Reuse cached matches if a file has already been processed
+                // Reuse cached parses for already-processed objects
                 let cached = cache.get(&memo_key);
                 let results = match cached {
                     None => {
@@ -126,7 +128,7 @@ fn process_head(
                         // Temp: Prove that we can get access to the file data.
                         let blob = obj.try_into_blob().context("Convert object to Blob")?;
 
-                        let results = find_matches_in_blob(&entry.filepath, &info.id, &blob)
+                        let results = find_matches_in_blob(&entry.filepath, info.id(), &blob)
                             .unwrap_or(Vec::new());
 
                         cache.insert(memo_key.clone(), results);
@@ -142,13 +144,20 @@ fn process_head(
                         entry.oid,
                         results.len()
                     );
+                    // Fixup potentially cached revisions
                     for result in results {
+                        let result = Interesting {
+                            revision: revision.to_string(),
+                            ..result.clone()
+                        };
+
                         trace!(
-                            "\t\t\t{}: {} ({} {})",
+                            "\t\t\t{}: {} ({} {}) @ {}",
                             result.kind,
                             result.identifier,
                             result.hash,
-                            result.length
+                            result.length,
+                            result.revision,
                         );
 
                         let _count = result.insert(db)?;
@@ -168,11 +177,7 @@ fn process_head(
 /// extension, and chooses the corresponding extractor.
 ///
 /// TODO Extract language detection and matcher selection. Use file-format or infer crate.
-fn find_matches_in_blob(
-    path: &BString,
-    rev: &ObjectId,
-    blob: &Blob,
-) -> anyhow::Result<Vec<Interesting>> {
+fn find_matches_in_blob(path: &BString, rev: Id, blob: &Blob) -> anyhow::Result<Vec<Interesting>> {
     let path = path.to_string();
     let path = Path::new(&path);
 
@@ -224,7 +229,7 @@ fn find_matches_in_blob(
         matches.for_each(|matched| {
             if let Some(m) = process_match(
                 &"(self)".to_string(),
-                &rev.to_string(),
+                &rev,
                 path,
                 &language,
                 blob.data.as_slice(),
@@ -243,7 +248,7 @@ fn find_matches_in_blob(
 
 fn process_match(
     codebase: &String,
-    revision: &String,
+    revision: &Id,
     path: &Path,
     language: &Language,
     source_bytes: &[u8],

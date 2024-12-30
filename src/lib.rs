@@ -16,7 +16,7 @@ pub struct Codebase {
 
 /// Automatically-matched item of interest. These are generally persisted to the
 /// database for tracking movement.
-#[derive(Debug, Default, Eq, PartialEq)]
+#[derive(Debug, Clone, Default, Eq, PartialEq)]
 pub struct Interesting {
     // Location containing match.
     pub codebase: String,
