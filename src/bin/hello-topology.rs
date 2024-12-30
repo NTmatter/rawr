@@ -5,10 +5,10 @@
 use anyhow::{bail, Context};
 use clap::Parser;
 use gix::bstr::BStr;
+use gix::revision::walk::Info;
 use rawr::{db_connection, Interesting};
-use rusqlite::Connection;
 use std::path::PathBuf;
-use tracing::{error, warn};
+use tracing::warn;
 
 #[derive(Debug, Default, Clone, Parser)]
 struct Args {
@@ -69,8 +69,8 @@ fn main() -> anyhow::Result<()> {
     if items.len() > 1 {
         warn!("Got multiple results for {kind} {symbol} in {file:?}@{approved_rev}");
     }
-    let Some(item) = items.first() else {
-        bail!("Could not find entry for {kind} {symbol} in {file:?}@{approved_rev}");
+    let Some(interesting) = items.first() else {
+        bail!("Could not find initial entry for {kind} {symbol} in {file:?}@{approved_rev}");
     };
 
     // Build list of commits between approved and target revision
@@ -89,15 +89,60 @@ fn main() -> anyhow::Result<()> {
         .with_context(|| format!("Revision {to_rev} must be an object"))?
         .id;
 
-    let walker = repo
-        .rev_walk(vec![to_rev])
+    let mut revs = Vec::new();
+    repo.rev_walk(vec![to_rev])
         .with_pruned(vec![from_rev])
-        .all()?;
-    for rev in walker {
-        let rev = rev?;
+        .all()
+        .context("Build list of new revisions")?
+        .try_for_each(|revision| {
+            revs.push(revision?);
+            Ok::<(), anyhow::Error>(())
+        })?;
+    revs.reverse();
+
+    let mut changes: Vec<Info> = Vec::new();
+
+    let mut hash = interesting.hash.clone();
+    let mut hash_stripped = interesting.hash_stripped.clone();
+
+    // Walk revision history to find changed hashes
+    for rev in revs {
         println!("{}: {:?}", rev.id, rev.commit_time);
 
-        // TODO Lookup hash
+        let interesting = Interesting::get_watched_item_at_revision(
+            &db,
+            &codebase,
+            &rev.id.to_string(),
+            &file,
+            &kind,
+            &symbol,
+        )?;
+        let Some(Interesting {
+            hash: new_hash,
+            hash_stripped: new_hash_stripped,
+            ..
+        }) = interesting.first()
+        else {
+            // Revision not found, or item deleted.
+            warn!(
+                "Repository Revision {} not found in database",
+                rev.id.to_string()
+            );
+            continue;
+        };
+
+        if hash.ne(new_hash) {
+            if hash_stripped.ne(new_hash_stripped) {
+                // Content updated
+            } else {
+                // Whitespace change only
+            }
+            hash = new_hash.clone();
+            hash_stripped = new_hash_stripped.clone();
+            changes.push(rev);
+        } else {
+            // No change
+        }
     }
 
     // Traverse from approved_in_rev to head

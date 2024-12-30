@@ -116,7 +116,7 @@ WHERE codebase = :codebase
         )?;
 
         let mut results = Vec::new();
-        let res: Result<(), anyhow::Error> = statement
+        statement
             .query_map(
                 named_params! {
                     ":codebase": codebase,
@@ -145,8 +145,8 @@ WHERE codebase = :codebase
             .try_for_each(|result| {
                 let result = result?;
                 results.push(result);
-                Ok(())
-            });
+                Ok::<(), anyhow::Error>(())
+            })?;
 
         Ok(results)
     }
