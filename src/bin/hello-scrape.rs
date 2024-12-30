@@ -10,8 +10,8 @@ use gix::bstr::BString;
 use gix::traverse::tree::Recorder;
 use gix::{Blob, ObjectId, Repository};
 use rawr::lang::{MatchType, Matcher, SupportedLanguage};
-use rawr::Interesting;
-use rusqlite::{Connection, Statement};
+use rawr::{db_connection, Interesting};
+use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -59,7 +59,6 @@ fn main() -> anyhow::Result<()> {
     debug!("Repo uses hash type {}", repo.object_hash());
 
     let db = db_connection(db_path)?;
-    let mut stmt = Interesting::insert_query(&db)?;
 
     // TODO Consider a concurrent hashmap
     let mut cache: HashMap<MemoKey, Vec<Interesting>> = HashMap::new();
@@ -69,9 +68,8 @@ fn main() -> anyhow::Result<()> {
         .first()
         .context("At least one head must be specified")?
         .as_str();
-    process_head(repo, &mut stmt, &mut cache, head)?;
+    process_head(repo, &db, &mut cache, head)?;
 
-    drop(stmt);
     let _ = db.close();
 
     Ok(())
@@ -79,7 +77,7 @@ fn main() -> anyhow::Result<()> {
 
 fn process_head(
     repo: Repository,
-    mut stmt: &mut Statement,
+    db: &Connection,
     cache: &mut HashMap<MemoKey, Vec<Interesting>>,
     head: &str,
 ) -> anyhow::Result<()> {
@@ -153,7 +151,7 @@ fn process_head(
                             result.length
                         );
 
-                        let _count = result.insert_prepared(&mut stmt)?;
+                        let _count = result.insert(db)?;
                     }
                 }
 
@@ -364,8 +362,8 @@ fn process_match(
             format!("{:02x}", result)
         });
 
-    let start_byte = root_match.node.start_byte();
-    let length = root_match.node.end_byte() - root_match.node.start_byte();
+    let start_byte = root_match.node.start_byte() as u64;
+    let length = (root_match.node.end_byte() - root_match.node.start_byte()) as u64;
 
     Some(Interesting {
         codebase: codebase.to_string(),
@@ -381,15 +379,4 @@ fn process_match(
         hash_stripped,
         notes: None,
     })
-}
-
-fn db_connection(db_path: PathBuf) -> anyhow::Result<Connection> {
-    let conn = Connection::open(db_path).context("Open or create database")?;
-    conn.pragma_update(None, "foreign_keys", "ON")
-        .context("Enable foreign key support")?;
-
-    conn.execute_batch(include_str!("../rawr.sql"))
-        .context("Create tables if needed")?;
-
-    Ok(conn)
 }

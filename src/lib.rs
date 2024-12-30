@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use rusqlite::{named_params, Connection, Row, Statement};
+use anyhow::Context;
+use rusqlite::{named_params, Connection, OptionalExtension};
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 pub mod lang;
 
@@ -18,11 +21,12 @@ pub struct Interesting {
     // Location containing match.
     pub codebase: String,
     pub revision: String,
+    /// Relative path to file
     pub path: String,
     /// Offset from start of file, in bytes.
-    pub start_byte: usize,
+    pub start_byte: u64,
     /// Length of match, in bytes.
-    pub length: usize,
+    pub length: u64,
 
     // Type and identifier
     /// Type of matched object
@@ -43,11 +47,23 @@ pub struct Interesting {
     pub notes: Option<String>,
 }
 
+pub fn db_connection(db_path: PathBuf) -> anyhow::Result<Connection> {
+    // TODO Disable Open with URI
+    let conn = Connection::open(db_path).context("Open or create database")?;
+    conn.pragma_update(None, "foreign_keys", "ON")
+        .context("Enable foreign key support")?;
+
+    conn.execute_batch(include_str!("rawr.sql"))
+        .context("Create tables if needed")?;
+
+    Ok(conn)
+}
+
 impl Interesting {
-    /// Builds a prepared statement for bulk inserting into database
-    pub fn insert_query(db: &Connection) -> anyhow::Result<Statement> {
+    /// Insert into database via prepared statemet
+    pub fn insert(&self, db: &Connection) -> anyhow::Result<usize> {
         // language=sqlite
-        let prepared_query = db.prepare(
+        let mut statement = db.prepare_cached(
             r#"INSERT OR IGNORE INTO upstream
 (codebase, revision, path, start_byte, length, identifier, kind, hash_algorithm, salt, hash,
  hash_stripped, notes)
@@ -56,12 +72,7 @@ VALUES
 :hash_stripped, :notes)"#,
         )?;
 
-        Ok(prepared_query)
-    }
-
-    /// Insert into database via prepared statemet
-    pub fn insert_prepared(&self, stmt: &mut Statement) -> anyhow::Result<usize> {
-        let count = stmt.execute(named_params! {
+        let count = statement.execute(named_params! {
             ":codebase": self.codebase,
             ":revision": self.revision,
             ":path": self.path,
@@ -78,28 +89,126 @@ VALUES
 
         Ok(count)
     }
-}
 
-impl TryFrom<Row<'_>> for Interesting {
-    type Error = anyhow::Error;
+    /// Retrieve metadata for an item at a particular revision.
+    ///
+    /// Does not allow handling duplicate definitions.
+    ///
+    /// DESIGN Improve handling of duplicate items (eg re-definition) within a file.
+    /// TODO Take an optional hash and/or offset.
+    pub fn get_watched_item_at_revision(
+        db: &Connection,
+        codebase: &str,
+        revision: &str,
+        path: &PathBuf,
+        kind: &str,
+        identifier: &str,
+    ) -> anyhow::Result<Vec<Self>> {
+        // language=sqlite
+        let mut statement = db.prepare_cached(
+            "SELECT *
+FROM upstream
+WHERE codebase = :codebase
+  AND revision = :revision
+  AND path = :path
+  AND kind = :kind
+  AND identifier = :identifier",
+        )?;
 
-    fn try_from(value: Row<'_>) -> Result<Self, Self::Error> {
-        let item = Self {
-            codebase: value.get("codebase")?,
-            revision: value.get("revision")?,
-            path: value.get("path")?,
-            start_byte: value.get("start_byte")?,
-            length: value.get("length")?,
-            kind: value.get("kind")?,
-            identifier: value.get("identifier")?,
-            hash_algorithm: value.get("hash_algorithm")?,
-            salt: value.get("salt")?,
-            hash: value.get("hash")?,
-            hash_stripped: value.get("hash_stripped")?,
-            notes: value.get("notes")?,
-        };
+        let mut results = Vec::new();
+        let res: Result<(), anyhow::Error> = statement
+            .query_map(
+                named_params! {
+                    ":codebase": codebase,
+                    ":revision": revision,
+                    ":path": path.to_string_lossy(),
+                    ":kind": kind,
+                    ":identifier": identifier,
+                },
+                |row| {
+                    Ok(Self {
+                        codebase: row.get("codebase")?,
+                        revision: row.get("revision")?,
+                        path: row.get("path")?,
+                        start_byte: row.get("start_byte")?,
+                        length: row.get("length")?,
+                        kind: row.get("kind")?,
+                        identifier: row.get("identifier")?,
+                        hash_algorithm: row.get("hash_algorithm")?,
+                        salt: row.get("salt")?,
+                        hash: row.get("hash")?,
+                        hash_stripped: row.get("hash_stripped")?,
+                        notes: row.get("notes")?,
+                    })
+                },
+            )?
+            .try_for_each(|result| {
+                let result = result?;
+                results.push(result);
+                Ok(())
+            });
 
-        Ok(item)
+        Ok(results)
+    }
+
+    pub fn get_one_from_db(
+        db: &Connection,
+        codebase: &str,
+        revision: &str,
+        path: PathBuf,
+        kind: &str,
+        identifier: &str,
+        salt: Option<u64>,
+        hash_algorithm: &str,
+        hash: &str,
+    ) -> anyhow::Result<Option<Self>> {
+        // language=sqlite
+        let mut statement = db.prepare_cached(
+            "SELECT *
+FROM upstream
+WHERE codebase = :codebase
+  AND revision = :revision
+  AND path = :path
+  AND kind = :kind
+  AND identifier = :identifier
+  AND hash_algorithm = :hash_algorithm
+  AND salt = :salt
+  AND hash = :hash
+  LIMIT 1",
+        )?;
+
+        let res = statement
+            .query_row(
+                named_params! {
+                    ":codebase": codebase,
+                    ":revision": revision,
+                    ":path": path.to_string_lossy(),
+                    ":kind": kind,
+                    ":identifier": identifier,
+                    ":salt": salt,
+                    ":hash_algorithm": hash_algorithm,
+                    ":hash": hash,
+                },
+                |row| {
+                    Ok(Self {
+                        codebase: row.get("codebase")?,
+                        revision: row.get("revision")?,
+                        path: row.get("path")?,
+                        start_byte: row.get("start_byte")?,
+                        length: row.get("length")?,
+                        kind: row.get("kind")?,
+                        identifier: row.get("identifier")?,
+                        hash_algorithm: row.get("hash_algorithm")?,
+                        salt: row.get("salt")?,
+                        hash: row.get("hash")?,
+                        hash_stripped: row.get("hash_stripped")?,
+                        notes: row.get("notes")?,
+                    })
+                },
+            )
+            .optional()?;
+
+        Ok(res)
     }
 }
 
@@ -121,3 +230,14 @@ pub struct Watched {
     pub notes: Option<String>,
     // TODO Optional checksum to avoid lookup?
 }
+
+#[derive(Debug, Hash, Eq, PartialEq)]
+pub enum Change {
+    Added,
+    Deleted,
+    Moved,
+    Modified,
+    WhitespaceOnly,
+}
+
+pub type Changes = HashSet<Change>;
