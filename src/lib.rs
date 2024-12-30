@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use rusqlite::{named_params, Connection, Statement};
+use rusqlite::{named_params, Connection, Row, Statement};
 
 pub mod lang;
 
@@ -77,6 +77,29 @@ VALUES
         })?;
 
         Ok(count)
+    }
+}
+
+impl TryFrom<Row<'_>> for Interesting {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Row<'_>) -> Result<Self, Self::Error> {
+        let item = Self {
+            codebase: value.get("codebase")?,
+            revision: value.get("revision")?,
+            path: value.get("path")?,
+            start_byte: value.get("start_byte")?,
+            length: value.get("length")?,
+            kind: value.get("kind")?,
+            identifier: value.get("identifier")?,
+            hash_algorithm: value.get("hash_algorithm")?,
+            salt: value.get("salt")?,
+            hash: value.get("hash")?,
+            hash_stripped: value.get("hash_stripped")?,
+            notes: value.get("notes")?,
+        };
+
+        Ok(item)
     }
 }
 
