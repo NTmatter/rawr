@@ -48,7 +48,7 @@ impl Interesting {
     pub fn insert_query(db: &Connection) -> anyhow::Result<Statement> {
         // language=sqlite
         let prepared_query = db.prepare(
-            r#"INSERT INTO upstream
+            r#"INSERT OR IGNORE INTO upstream
 (codebase, revision, path, start_byte, length, identifier, kind, hash_algorithm, salt, hash,
  hash_stripped, notes)
 VALUES

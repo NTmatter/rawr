@@ -54,7 +54,10 @@ CREATE TABLE IF NOT EXISTS upstream
     hash_stripped  TEXT,
 
     -- Optional notes regarding item.
-    notes          TEXT
+    notes          TEXT,
+
+    -- Prevent duplicates of already-processed data.
+    CONSTRAINT UQ_upstream UNIQUE (codebase, revision, path, start_byte, length, identifier, kind, hash_algorithm, hash)
 
 -- Skip FK for now, to simplify build.
 --     CONSTRAINT FK_upstream_codebase FOREIGN KEY (codebase)

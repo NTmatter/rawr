@@ -8,16 +8,16 @@ use anyhow::Context;
 use clap::Parser as ClapParser;
 use gix::bstr::BString;
 use gix::traverse::tree::Recorder;
-use gix::{Blob, Id, ObjectId};
+use gix::{Blob, ObjectId, Repository};
 use rawr::lang::{MatchType, Matcher, SupportedLanguage};
 use rawr::Interesting;
-use rusqlite::Connection;
+use rusqlite::{Connection, Statement};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
 
 #[derive(ClapParser, Debug)]
@@ -55,22 +55,34 @@ fn main() -> anyhow::Result<()> {
     language_matchers.insert(SupportedLanguage::Rust, rawr::lang::matchers_rust());
     language_matchers.insert(SupportedLanguage::Bash, rawr::lang::matchers_bash());
 
-    // TODO Use concurrent hashmap instead of RWLock.
-    // let cache = RwLock::new(HashMap::<MemoKey, Vec<Interesting>>::new());
-
     let repo = gix::discover(repo_path).context("Repository exists at provided path")?;
     debug!("Repo uses hash type {}", repo.object_hash());
 
     let db = db_connection(db_path)?;
     let mut stmt = Interesting::insert_query(&db)?;
 
-    let mut seen_path_versions: HashMap<MemoKey, Vec<Interesting>> = HashMap::new();
+    // TODO Consider a concurrent hashmap
+    let mut cache: HashMap<MemoKey, Vec<Interesting>> = HashMap::new();
 
     // TODO Iterate over all heads
     let head = heads
         .first()
         .context("At least one head must be specified")?
         .as_str();
+    process_head(repo, &mut stmt, &mut cache, head)?;
+
+    drop(stmt);
+    let _ = db.close();
+
+    Ok(())
+}
+
+fn process_head(
+    repo: Repository,
+    mut stmt: &mut Statement,
+    cache: &mut HashMap<MemoKey, Vec<Interesting>>,
+    head: &str,
+) -> anyhow::Result<()> {
     let rev = repo
         .rev_parse_single(head)
         .context("Repo must contain specified revision")?;
@@ -80,10 +92,10 @@ fn main() -> anyhow::Result<()> {
         .context("Walk all ancestor revisions")?;
     ancestors.try_for_each(|info| {
         let info = info?;
-        println!("Got Ancestor: {}", info.id());
+        debug!("Processing revision: {}", info.id());
 
         let Ok(commit) = info.object() else {
-            println!("Not a commit. Skipping.");
+            warn!("Not a commit. Skipping.");
             return Result::<(), anyhow::Error>::Ok(());
         };
 
@@ -108,7 +120,7 @@ fn main() -> anyhow::Result<()> {
 
                 // DESIGN Use the entries API, but how to handle control flow?
                 // Reuse cached matches if a file has already been processed
-                let cached = seen_path_versions.get(&memo_key);
+                let cached = cache.get(&memo_key);
                 let results = match cached {
                     None => {
                         let obj = repo.find_object(entry.oid).context("Find file blob")?;
@@ -116,20 +128,25 @@ fn main() -> anyhow::Result<()> {
                         // Temp: Prove that we can get access to the file data.
                         let blob = obj.try_into_blob().context("Convert object to Blob")?;
 
-                        let results = find_matches_in_blob(&entry.filepath, &rev, &blob)
+                        let results = find_matches_in_blob(&entry.filepath, &info.id, &blob)
                             .unwrap_or(Vec::new());
 
-                        seen_path_versions.insert(memo_key.clone(), results);
-                        seen_path_versions.get(&memo_key).unwrap()
+                        cache.insert(memo_key.clone(), results);
+                        cache.get(&memo_key).unwrap()
                     }
                     Some(results) => results,
                 };
 
                 if !results.is_empty() {
-                    debug!("{} {} {} results", entry.filepath, entry.oid, results.len());
+                    debug!(
+                        "\t\t{} {} {} results",
+                        entry.filepath,
+                        entry.oid,
+                        results.len()
+                    );
                     for result in results {
                         trace!(
-                            "{}: {} ({} {})",
+                            "\t\t\t{}: {} ({} {})",
                             result.kind,
                             result.identifier,
                             result.hash,
@@ -146,8 +163,6 @@ fn main() -> anyhow::Result<()> {
         Result::<(), anyhow::Error>::Ok(())
     })?;
 
-    let _ = db.close();
-
     Ok(())
 }
 
@@ -155,7 +170,11 @@ fn main() -> anyhow::Result<()> {
 /// extension, and chooses the corresponding extractor.
 ///
 /// TODO Extract language detection and matcher selection. Use file-format or infer crate.
-fn find_matches_in_blob(path: &BString, rev: &Id, blob: &Blob) -> anyhow::Result<Vec<Interesting>> {
+fn find_matches_in_blob(
+    path: &BString,
+    rev: &ObjectId,
+    blob: &Blob,
+) -> anyhow::Result<Vec<Interesting>> {
     let path = path.to_string();
     let path = Path::new(&path);
 
@@ -274,8 +293,6 @@ fn process_match(
         return None;
     };
 
-    // TODO Get matched bytes, then convert to string for identifiers?
-    // TODO Try to capture start and length
     // DESIGN Rewrite all arms to fill a buf.
     // Contents
     let mut buf = Vec::<u8>::new();
