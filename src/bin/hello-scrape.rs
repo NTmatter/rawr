@@ -17,7 +17,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
 
 #[derive(ClapParser, Debug)]
@@ -62,6 +62,7 @@ fn main() -> anyhow::Result<()> {
     debug!("Repo uses hash type {}", repo.object_hash());
 
     let db = db_connection(db_path)?;
+    let mut stmt = Interesting::insert_query(&db)?;
 
     let mut seen_path_versions: HashMap<MemoKey, Vec<Interesting>> = HashMap::new();
 
@@ -125,19 +126,18 @@ fn main() -> anyhow::Result<()> {
                 };
 
                 if !results.is_empty() {
-                    println!(
-                        "\t\t{} {} {} results",
-                        entry.filepath,
-                        entry.oid,
-                        results.len()
-                    );
-                    results.iter().for_each(|result| {
-                        // TODO Insert into database
-                        println!(
-                            "\t\t\t{}: {} ({} {})",
-                            result.kind, result.identifier, result.hash, result.length
-                        )
-                    });
+                    debug!("{} {} {} results", entry.filepath, entry.oid, results.len());
+                    for result in results {
+                        trace!(
+                            "{}: {} ({} {})",
+                            result.kind,
+                            result.identifier,
+                            result.hash,
+                            result.length
+                        );
+
+                        let _count = result.insert_prepared(&mut stmt)?;
+                    }
                 }
 
                 Result::<(), anyhow::Error>::Ok(())
@@ -145,6 +145,8 @@ fn main() -> anyhow::Result<()> {
 
         Result::<(), anyhow::Error>::Ok(())
     })?;
+
+    let _ = db.close();
 
     Ok(())
 }

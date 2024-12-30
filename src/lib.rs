@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+use rusqlite::{named_params, Connection, Statement};
+
 pub mod lang;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -39,6 +41,43 @@ pub struct Interesting {
     pub hash_stripped: Option<String>,
 
     pub notes: Option<String>,
+}
+
+impl Interesting {
+    /// Builds a prepared statement for bulk inserting into database
+    pub fn insert_query(db: &Connection) -> anyhow::Result<Statement> {
+        // language=sqlite
+        let prepared_query = db.prepare(
+            r#"INSERT INTO upstream
+(codebase, revision, path, start_byte, length, identifier, kind, hash_algorithm, salt, hash,
+ hash_stripped, notes)
+VALUES
+(:codebase, :revision, :path, :start_byte, :length, :identifier, :kind, :hash_algorithm, :salt, :hash,
+:hash_stripped, :notes)"#,
+        )?;
+
+        Ok(prepared_query)
+    }
+
+    /// Insert into database via prepared statemet
+    pub fn insert_prepared(&self, stmt: &mut Statement) -> anyhow::Result<usize> {
+        let count = stmt.execute(named_params! {
+            ":codebase": self.codebase,
+            ":revision": self.revision,
+            ":path": self.path,
+            ":start_byte": self.start_byte,
+            ":length": self.length,
+            ":identifier": self.identifier,
+            ":kind": self.kind,
+            ":hash_algorithm": self.hash_algorithm,
+            ":salt": self.salt,
+            ":hash": self.hash,
+            ":hash_stripped": self.hash_stripped,
+            ":notes": self.notes,
+        })?;
+
+        Ok(count)
+    }
 }
 
 /// Corresponds to the fields of the RAWR annotation.
