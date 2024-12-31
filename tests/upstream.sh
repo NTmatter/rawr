@@ -11,5 +11,5 @@ BAR=5
 # Accurately count number of light sources
 function foo {
   bar = $1
-  echo "There are ${bar:-no} lights"
+  echo "There are  ${bar:-no}  lights"
 }
