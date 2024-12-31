@@ -128,8 +128,12 @@ fn process_head(
                         // Temp: Prove that we can get access to the file data.
                         let blob = obj.try_into_blob().context("Convert object to Blob")?;
 
-                        let results = find_matches_in_blob(&entry.filepath, info.id(), &blob)
+                        let mut results = find_matches_in_blob(&entry.filepath, info.id(), &blob)
                             .unwrap_or(Vec::new());
+
+                        // Checksum whole file instead of relying on a matcher.
+                        let file_match = match_whole_file(&entry.filepath, info.id(), &blob);
+                        results.push(file_match);
 
                         cache.insert(memo_key.clone(), results);
                         cache.get(&memo_key).unwrap()
@@ -241,9 +245,63 @@ fn find_matches_in_blob(path: &BString, rev: Id, blob: &Blob) -> anyhow::Result<
         });
     }
 
-    // These should probably be concatenated for efficiency, but settle for repeated searches. O(matches * files)
-    // todo!("Open file, parse, and build list of all matches");
+    // These should probably be concatenated for efficiency, but settle for repeated searches. O(matchers * files)
     Ok(interesting_matches)
+}
+
+/// Compute SHA256 Hash of a byte array and its best-effort
+/// whitespace-agnostic hash.
+fn blob_hashes(contents: &[u8]) -> (String, String, Option<String>) {
+    // Salted hash of contents, in case of sensitive data.
+    let hash_algorithm = "sha256".to_string();
+    let mut hasher = Sha256::new();
+
+    // Consider salting the hash. This will prevent simple lookup.
+    // let salt: Option<u64> = Some(rand::random());
+    let salt: Option<u64> = None;
+    if let Some(salt) = salt {
+        hasher.update(salt.to_be_bytes());
+    }
+
+    hasher.update(contents);
+    let hash = hasher.finalize();
+
+    let hash = format!("{:02x}", hash);
+
+    // Strip whitespace and generate hash if text is valid utf8.
+    let hash_stripped = String::from_utf8(contents.to_vec())
+        .ok()
+        .map(|s| s.chars().filter(|c| !c.is_whitespace()).collect::<String>())
+        .map(|s| {
+            let mut hasher = Sha256::new();
+            if let Some(salt) = salt {
+                hasher.update(salt.to_be_bytes());
+            }
+            hasher.update(s);
+            let result = hasher.finalize();
+            format!("{:02x}", result)
+        });
+
+    (hash_algorithm, hash, hash_stripped)
+}
+
+fn match_whole_file(path: &BString, rev: Id, blob: &Blob) -> Interesting {
+    let (hash_algorithm, hash, hash_stripped) = blob_hashes(&blob.data);
+
+    Interesting {
+        codebase: "(self)".to_string(),
+        revision: rev.to_string(),
+        path: path.to_string(),
+        start_byte: 0,
+        length: blob.data.len() as u64,
+        kind: "file".to_string(),
+        identifier: path.to_string(),
+        hash_algorithm,
+        salt: None,
+        hash,
+        hash_stripped,
+        notes: None,
+    }
 }
 
 fn process_match(
@@ -338,35 +396,7 @@ fn process_match(
     };
 
     // Salted hash of contents, in case of sensitive data.
-    let hash_algorithm = "sha256".to_string();
-    let mut hasher = Sha256::new();
-
-    // Consider salting the hash. This will prevent simple lookup.
-    // let salt: Option<u64> = Some(rand::random());
-    let salt: Option<u64> = None;
-    if let Some(salt) = salt {
-        hasher.update(salt.to_be_bytes());
-    }
-
-    hasher.update(contents);
-    let hash = hasher.finalize();
-
-    let hash = format!("{:02x}", hash);
-
-    // Strip whitespace and generate hash if text is valid utf8.
-    let hash_stripped = String::from_utf8(contents.to_vec())
-        .ok()
-        .map(|s| s.chars().filter(|c| !c.is_whitespace()).collect::<String>())
-        .map(|s| {
-            let mut hasher = Sha256::new();
-            if let Some(salt) = salt {
-                hasher.update(salt.to_be_bytes());
-            }
-            hasher.update(s);
-            let result = hasher.finalize();
-            format!("{:02x}", result)
-        });
-
+    let (hash_algorithm, hash, hash_stripped) = blob_hashes(contents);
     let start_byte = root_match.node.start_byte() as u64;
     let length = (root_match.node.end_byte() - root_match.node.start_byte()) as u64;
 
@@ -379,7 +409,7 @@ fn process_match(
         kind: matcher.kind.to_string(),
         identifier: identifier.to_string(),
         hash_algorithm,
-        salt,
+        salt: None,
         hash,
         hash_stripped,
         notes: None,
