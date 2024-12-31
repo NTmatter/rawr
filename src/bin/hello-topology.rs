@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+
 //! Look for 'changes since revision' for a symbol of interest.
 //! Traverse the graph from the last accepted revision through to the
 //! target head, looking for changes in the hash and stripped hash.
@@ -107,8 +109,6 @@ fn main() -> anyhow::Result<()> {
 
     // Walk revision history to find changed hashes
     for rev in revs {
-        println!("{}: {:?}", rev.id, rev.commit_time);
-
         let interesting = Interesting::get_watched_item_at_revision(
             &db,
             &codebase,
@@ -131,7 +131,7 @@ fn main() -> anyhow::Result<()> {
             if hash_stripped.ne(new_hash_stripped) {
                 // Content updated
                 trace!(
-                    "Updated content for {} {} in {} @ {}",
+                    "{} {} in {} @ {}: Updated content",
                     kind,
                     symbol,
                     file.display(),
@@ -140,7 +140,7 @@ fn main() -> anyhow::Result<()> {
             } else {
                 // Whitespace change only
                 trace!(
-                    "Whitespace change for {} {} in {} @ {}",
+                    "{} {} in {} @ {}: Whitespace change",
                     kind,
                     symbol,
                     file.display(),
