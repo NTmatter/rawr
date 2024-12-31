@@ -155,15 +155,15 @@ pub fn matchers_bash() -> Vec<Matcher> {
     use MatchType::*;
     vec![
         Matcher {
-            kind: "Variable".to_string(),
-            query: "(variable_assignment)".to_string(),
+            kind: "variable".to_string(),
+            query: "((variable_assignment) @va)".to_string(),
             identifier: Named("name".to_string()),
             contents: Named("value".to_string()),
             notes: None,
         },
         Matcher {
-            kind: "Function".to_string(),
-            query: "(function_definition)".to_string(),
+            kind: "function".to_string(),
+            query: "((function_definition) @fd)".to_string(),
             identifier: Named("name".to_string()),
             contents: Named("body".to_string()),
             notes: None,
