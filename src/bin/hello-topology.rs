@@ -124,13 +124,6 @@ fn main() -> anyhow::Result<()> {
         }) = interesting.first()
         else {
             // Revision not found, or item deleted.
-            trace!(
-                "No database result for {} {} in {} @ {}",
-                kind,
-                symbol,
-                file.display(),
-                rev.id.to_string()
-            );
             continue;
         };
 
@@ -161,14 +154,5 @@ fn main() -> anyhow::Result<()> {
             // No change
         }
     }
-
-    // Traverse from approved_in_rev to head
-    // foreach rev {
-    //   fetch new hashes from database
-    //   compare and notify if changed.
-    //     hash change vs whitespace-only change.
-    //   set hashes and look for more changes
-    //  }
-
     Ok(())
 }
