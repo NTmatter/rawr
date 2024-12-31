@@ -8,7 +8,7 @@ use gix::bstr::BStr;
 use gix::revision::walk::Info;
 use rawr::{db_connection, Interesting};
 use std::path::PathBuf;
-use tracing::warn;
+use tracing::{trace, warn};
 
 #[derive(Debug, Default, Clone, Parser)]
 struct Args {
@@ -124,8 +124,11 @@ fn main() -> anyhow::Result<()> {
         }) = interesting.first()
         else {
             // Revision not found, or item deleted.
-            warn!(
-                "Repository Revision {} not found in database",
+            trace!(
+                "No database result for {} {} in {} @ {}",
+                kind,
+                symbol,
+                file.display(),
                 rev.id.to_string()
             );
             continue;
@@ -134,8 +137,22 @@ fn main() -> anyhow::Result<()> {
         if hash.ne(new_hash) {
             if hash_stripped.ne(new_hash_stripped) {
                 // Content updated
+                trace!(
+                    "Updated content for {} {} in {} @ {}",
+                    kind,
+                    symbol,
+                    file.display(),
+                    rev.id.to_string()
+                );
             } else {
                 // Whitespace change only
+                trace!(
+                    "Whitespace change for {} {} in {} @ {}",
+                    kind,
+                    symbol,
+                    file.display(),
+                    rev.id.to_string()
+                );
             }
             hash = new_hash.clone();
             hash_stripped = new_hash_stripped.clone();
