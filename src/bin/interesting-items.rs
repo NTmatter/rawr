@@ -235,8 +235,8 @@ fn process_match(
 
     let hash = format!("{:02x}", Sha256::digest(contents));
 
-    let start_byte = root_match.node.start_byte();
-    let length = root_match.node.end_byte() - root_match.node.start_byte();
+    let start_byte = root_match.node.start_byte() as u64;
+    let length = (root_match.node.end_byte() - root_match.node.start_byte()) as u64;
 
     Some(Interesting {
         codebase: codebase.to_string(),

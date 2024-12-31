@@ -17,7 +17,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
 
 #[derive(ClapParser, Debug)]
@@ -218,8 +218,8 @@ fn find_matches_in_blob(path: &BString, rev: Id, blob: &Blob) -> anyhow::Result<
         let query = match Query::new(&language, matcher.query.as_str()) {
             Ok(query) => query,
             Err(e) => {
-                eprintln!("Skipping unparseable query {}", matcher.query);
-                eprintln!("{}", e);
+                error!("Skipping unparseable query {}", matcher.query);
+                error!("{}", e);
                 continue;
             }
         };
@@ -333,7 +333,7 @@ fn process_match(
     };
 
     let Some(contents) = body_bytes else {
-        println!("Failed to match contents");
+        error!("Failed to match contents");
         return None;
     };
 
