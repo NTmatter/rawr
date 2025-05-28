@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use regex::Regex;
+use serde::Deserializer;
 use serde::de;
 use serde::de::Deserialize;
-use serde::Deserializer;
 use std::sync::OnceLock;
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -76,7 +76,7 @@ impl<'de> Deserialize<'de> for MatchType {
                 return Err(de::Error::unknown_variant(
                     "",
                     &["Match", "Named", "Kind", "String", "SubQuery"],
-                ))
+                ));
             }
         }
     }

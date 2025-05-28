@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Context;
-use rusqlite::{named_params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, named_params};
 use std::collections::HashSet;
 use std::path::PathBuf;
 

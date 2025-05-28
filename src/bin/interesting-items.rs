@@ -8,8 +8,8 @@
 
 use anyhow::bail;
 use clap::Parser as ClapParser;
-use rawr::lang::{MatchType, Matcher, SupportedLanguage};
 use rawr::Interesting;
+use rawr::lang::{MatchType, Matcher, SupportedLanguage};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;

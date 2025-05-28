@@ -140,7 +140,7 @@ impl<'de> Deserialize<'de> for Foo {
                 return Err(de::Error::unknown_variant(
                     unknown,
                     &["A", "B(u64)", "C(String)", "D(u64, String)"],
-                ))
+                ));
             }
         };
     }

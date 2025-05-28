@@ -10,7 +10,7 @@ use gix::bstr::BString;
 use gix::traverse::tree::Recorder;
 use gix::{Blob, Id, ObjectId, Repository};
 use rawr::lang::{MatchType, Matcher, SupportedLanguage};
-use rawr::{db_connection, Interesting};
+use rawr::{Interesting, db_connection};
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
