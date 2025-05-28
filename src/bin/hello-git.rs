@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
     for entry in entries {
         println!(
             "{:06o} {:4} {}    {}",
-            *entry.mode,
+            entry.mode,
             entry.mode.as_str(),
             entry.oid,
             entry.filepath

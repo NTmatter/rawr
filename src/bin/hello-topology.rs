@@ -93,7 +93,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut revs = Vec::new();
     repo.rev_walk(vec![to_rev])
-        .with_pruned(vec![from_rev])
+        .with_boundary(vec![from_rev])
         .all()
         .context("Build list of new revisions")?
         .try_for_each(|revision| {

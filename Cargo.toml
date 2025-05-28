@@ -11,18 +11,18 @@ license = "Apache-2.0"
 anyhow = "1.0.95"
 clap = { version = "4.5.23", features = ["derive"] }
 # TODO Add gix features = ["parallel"] and try to parallelize for larger codebases.
-gix = "0.69.1"
-rand = "0.8.5"
-rusqlite = { version = "0.32.1", features = ["bundled"] }
+gix = "0.72.1"
+rand = "0.9.1"
+rusqlite = { version = "0.36.0", features = ["bundled"] }
 sha2 = "0.10.8"
 toml = { version = "0.8.19", features = ["parse"] }
 
 # TreeSitter and language support
-tree-sitter = "0.24.6"
+tree-sitter = "0.25.5"
 tree-sitter-bash = "0.23.3"
-tree-sitter-c = "0.23.4"
+tree-sitter-c = "0.24.1"
 tree-sitter-cpp = "0.23.4"
-tree-sitter-rust = "0.23.2"
+tree-sitter-rust = "0.24.0"
 
 serde = { version = "1.0.217", features = ["derive"] }
 regex = "1.11.1"
