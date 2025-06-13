@@ -6,10 +6,9 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
-use anyhow::bail;
 use clap::Parser as ClapParser;
+use rawr::lang::{Bash, LanguageMatcher, MatchType, Matcher, Rust, SupportedLanguage};
 use rawr::Interesting;
-use rawr::lang::{MatchType, Matcher, SupportedLanguage};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -34,8 +33,8 @@ fn main() -> anyhow::Result<()> {
 
     // Build matchers for supported languages
     let mut language_matchers = HashMap::<SupportedLanguage, Vec<Matcher>>::new();
-    language_matchers.insert(SupportedLanguage::Rust, rawr::lang::matchers_rust());
-    language_matchers.insert(SupportedLanguage::Bash, rawr::lang::matchers_bash());
+    language_matchers.insert(SupportedLanguage::Rust, Rust::matchers());
+    language_matchers.insert(SupportedLanguage::Bash, Bash::matchers());
 
     // Process known filetypes
     args.files.into_iter().for_each(|arg| {
@@ -65,14 +64,8 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     println!("Searching for matches in {}", path.display());
 
     let (language, matchers) = match lang {
-        SupportedLanguage::Rust => (
-            tree_sitter_rust::LANGUAGE.into(),
-            rawr::lang::matchers_rust(),
-        ),
-        SupportedLanguage::Bash => (
-            tree_sitter_bash::LANGUAGE.into(),
-            rawr::lang::matchers_bash(),
-        ),
+        SupportedLanguage::Rust => (tree_sitter_rust::LANGUAGE.into(), Rust::matchers()),
+        SupportedLanguage::Bash => (tree_sitter_bash::LANGUAGE.into(), Bash::matchers()),
     };
 
     // Open and read file
@@ -86,9 +79,7 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
         .set_language(&language)
         .expect("Create language parser");
 
-    let tree = parser
-        .parse(&source_bytes.as_slice(), None)
-        .expect("Parse file");
+    let tree = parser.parse(&source_bytes, None).expect("Parse file");
 
     // Find matches
     let mut interesting_matches = Vec::<Interesting>::new();
@@ -109,11 +100,11 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
             if let Some(m) = process_match(
                 &"(self)".to_string(),
                 &"(unversioned)".to_string(),
-                &path,
+                path,
                 &language,
                 &source_bytes,
-                &matcher,
-                &matched,
+                matcher,
+                matched,
             ) {
                 interesting_matches.push(m);
             }
@@ -134,9 +125,7 @@ fn process_match(
     matcher: &Matcher,
     matched: &QueryMatch,
 ) -> Option<Interesting> {
-    let Some(root_match) = matched.captures.get(0) else {
-        return None;
-    };
+    let root_match = matched.captures.get(0)?;
 
     let file_path = path.to_string_lossy();
 

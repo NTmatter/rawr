@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use regex::Regex;
-use serde::Deserializer;
 use serde::de;
 use serde::de::Deserialize;
+use serde::Deserializer;
 use std::sync::OnceLock;
 
 #[derive(Debug, Eq, PartialEq, Hash)]
@@ -82,6 +82,11 @@ impl<'de> Deserialize<'de> for MatchType {
     }
 }
 
+pub trait LanguageMatcher {
+    fn name() -> String;
+    fn matchers() -> Vec<Matcher>;
+}
+
 /// Assumes that the interesting parts are actually named in the Tree-Sitter
 /// grammar.
 #[derive(Debug, Eq, PartialEq)]
@@ -104,62 +109,74 @@ pub enum Query {
     Constant,
 }
 
-/// Build list of items that should be matched for Rust.
-pub fn matchers_rust() -> Vec<Matcher> {
-    use MatchType::*;
-    vec![
-        Matcher {
-            kind: "function".to_string(),
-            query: "((function_item) @fi)".to_string(),
-            identifier: Named("name".to_string()),
-            contents: Match,
-            notes: Some(
-                "Function, including visibility, name, parameters, return type, and body "
-                    .to_string(),
-            ),
-        },
-        Matcher {
-            kind: "struct".to_string(),
-            query: "((struct_item) @si)".to_string(),
-            identifier: Named("name".to_string()),
-            contents: Match,
-            notes: None,
-        },
-        Matcher {
-            kind: "const".to_string(),
-            query: "((const_item) @ci)".to_string(),
-            identifier: Named("name".to_string()),
-            // Should be the entire match, or possibly just the type and value.
-            contents: Named("value".to_string()),
-            notes: None,
-        },
-        Matcher {
-            kind: "enum".to_string(),
-            query: "((enum_item) @ei)".to_string(),
-            identifier: Named("name".to_string()),
-            contents: Named("body".to_string()),
-            notes: None,
-        },
-    ]
+pub struct Rust {}
+impl LanguageMatcher for Rust {
+    fn name() -> String {
+        "Rust".to_string()
+    }
+
+    fn matchers() -> Vec<Matcher> {
+        use MatchType::*;
+        vec![
+            Matcher {
+                kind: "function".to_string(),
+                query: "((function_item) @fi)".to_string(),
+                identifier: Named("name".to_string()),
+                contents: Match,
+                notes: Some(
+                    "Function, including visibility, name, parameters, return type, and body "
+                        .to_string(),
+                ),
+            },
+            Matcher {
+                kind: "struct".to_string(),
+                query: "((struct_item) @si)".to_string(),
+                identifier: Named("name".to_string()),
+                contents: Match,
+                notes: None,
+            },
+            Matcher {
+                kind: "const".to_string(),
+                query: "((const_item) @ci)".to_string(),
+                identifier: Named("name".to_string()),
+                // Should be the entire match, or possibly just the type and value.
+                contents: Named("value".to_string()),
+                notes: None,
+            },
+            Matcher {
+                kind: "enum".to_string(),
+                query: "((enum_item) @ei)".to_string(),
+                identifier: Named("name".to_string()),
+                contents: Named("body".to_string()),
+                notes: None,
+            },
+        ]
+    }
 }
 
-/// Build list of items that should be matched for Bash
-pub fn matchers_bash() -> Vec<Matcher> {
-    use MatchType::*;
-    vec![
-        Matcher {
-            kind: "variable".to_string(),
-            query: "((variable_assignment) @va)".to_string(),
-            identifier: Named("name".to_string()),
-            contents: Named("value".to_string()),
-            notes: None,
-        },
-        Matcher {
-            kind: "function".to_string(),
-            query: "((function_definition) @fd)".to_string(),
-            identifier: Named("name".to_string()),
-            contents: Named("body".to_string()),
-            notes: None,
-        },
-    ]
+pub struct Bash {}
+impl LanguageMatcher for Bash {
+    fn name() -> String {
+        "Bash".to_string()
+    }
+
+    fn matchers() -> Vec<Matcher> {
+        use MatchType::*;
+        vec![
+            Matcher {
+                kind: "variable".to_string(),
+                query: "((variable_assignment) @va)".to_string(),
+                identifier: Named("name".to_string()),
+                contents: Named("value".to_string()),
+                notes: None,
+            },
+            Matcher {
+                kind: "function".to_string(),
+                query: "((function_definition) @fd)".to_string(),
+                identifier: Named("name".to_string()),
+                contents: Named("body".to_string()),
+                notes: None,
+            },
+        ]
+    }
 }

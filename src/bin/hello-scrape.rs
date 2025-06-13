@@ -9,8 +9,8 @@ use clap::Parser as ClapParser;
 use gix::bstr::BString;
 use gix::traverse::tree::Recorder;
 use gix::{Blob, Id, ObjectId, Repository};
-use rawr::lang::{MatchType, Matcher, SupportedLanguage};
-use rawr::{Interesting, db_connection};
+use rawr::lang::{Bash, LanguageMatcher, MatchType, Matcher, Rust, SupportedLanguage};
+use rawr::{db_connection, Interesting};
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
@@ -52,8 +52,8 @@ fn main() -> anyhow::Result<()> {
     info!("Scraping repo {repo_path:?} into db {db_path:?}");
 
     let mut language_matchers = HashMap::<SupportedLanguage, Vec<Matcher>>::new();
-    language_matchers.insert(SupportedLanguage::Rust, rawr::lang::matchers_rust());
-    language_matchers.insert(SupportedLanguage::Bash, rawr::lang::matchers_bash());
+    language_matchers.insert(SupportedLanguage::Rust, Rust::matchers());
+    language_matchers.insert(SupportedLanguage::Bash, Bash::matchers());
 
     let repo = gix::discover(repo_path).context("Repository exists at provided path")?;
     debug!("Repo uses hash type {}", repo.object_hash());
@@ -199,8 +199,8 @@ fn find_matches_in_blob(path: &BString, rev: Id, blob: &Blob) -> anyhow::Result<
     };
 
     let (language, matchers) = match lang {
-        SupportedLanguage::Rust => (tree_sitter_rust::LANGUAGE, rawr::lang::matchers_rust()),
-        SupportedLanguage::Bash => (tree_sitter_bash::LANGUAGE, rawr::lang::matchers_bash()),
+        SupportedLanguage::Rust => (tree_sitter_rust::LANGUAGE, Rust::matchers()),
+        SupportedLanguage::Bash => (tree_sitter_bash::LANGUAGE, Bash::matchers()),
     };
 
     let language: Language = language.into();
