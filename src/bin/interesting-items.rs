@@ -8,7 +8,7 @@
 
 use clap::Parser as ClapParser;
 use rawr::lang::{Bash, LanguageMatcher, MatchType, Matcher, Rust, SupportedLanguage};
-use rawr::Interesting;
+use rawr::UpstreamMatch;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -60,7 +60,10 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<Vec<Interesting>> {
+fn find_matches_in_file(
+    path: &Path,
+    lang: SupportedLanguage,
+) -> anyhow::Result<Vec<UpstreamMatch>> {
     println!("Searching for matches in {}", path.display());
 
     let (language, matchers) = match lang {
@@ -82,7 +85,7 @@ fn find_matches_in_file(path: &Path, lang: SupportedLanguage) -> anyhow::Result<
     let tree = parser.parse(&source_bytes, None).expect("Parse file");
 
     // Find matches
-    let mut interesting_matches = Vec::<Interesting>::new();
+    let mut interesting_matches = Vec::<UpstreamMatch>::new();
     for matcher in &matchers {
         // Find matches and extract information
         let query = match Query::new(&language, matcher.query.as_str()) {
@@ -124,7 +127,7 @@ fn process_match(
     source_bytes: &[u8],
     matcher: &Matcher,
     matched: &QueryMatch,
-) -> Option<Interesting> {
+) -> Option<UpstreamMatch> {
     let root_match = matched.captures.get(0)?;
 
     let file_path = path.to_string_lossy();
@@ -227,7 +230,7 @@ fn process_match(
     let start_byte = root_match.node.start_byte() as u64;
     let length = (root_match.node.end_byte() - root_match.node.start_byte()) as u64;
 
-    Some(Interesting {
+    Some(UpstreamMatch {
         codebase: codebase.to_string(),
         revision: revision.to_string(),
         path: file_path.to_string(),

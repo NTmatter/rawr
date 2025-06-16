@@ -4,11 +4,11 @@
 //! Traverse the graph from the last accepted revision through to the
 //! target head, looking for changes in the hash and stripped hash.
 
-use anyhow::{Context, bail};
+use anyhow::{bail, Context};
 use clap::Parser;
 use gix::bstr::BStr;
 use gix::revision::walk::Info;
-use rawr::{Interesting, db_connection};
+use rawr::{db_connection, UpstreamMatch};
 use std::path::PathBuf;
 use tracing::{trace, warn};
 
@@ -59,7 +59,7 @@ fn main() -> anyhow::Result<()> {
 
     // Fetch initial (mut hash, mut hash_stripped) from database.
     let db = db_connection(db_path)?;
-    let items = Interesting::get_watched_item_at_revision(
+    let items = UpstreamMatch::get_watched_item_at_revision(
         &db,
         &codebase,
         &approved_rev,
@@ -109,7 +109,7 @@ fn main() -> anyhow::Result<()> {
 
     // Walk revision history to find changed hashes
     for rev in revs {
-        let interesting = Interesting::get_watched_item_at_revision(
+        let interesting = UpstreamMatch::get_watched_item_at_revision(
             &db,
             &codebase,
             &rev.id.to_string(),
@@ -117,7 +117,7 @@ fn main() -> anyhow::Result<()> {
             &kind,
             &symbol,
         )?;
-        let Some(Interesting {
+        let Some(UpstreamMatch {
             hash: new_hash,
             hash_stripped: new_hash_stripped,
             ..

@@ -1,12 +1,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Context;
-use rusqlite::{Connection, OptionalExtension, named_params};
-use std::collections::HashSet;
+use rusqlite::{named_params, Connection, OptionalExtension};
 use std::path::PathBuf;
 
 pub mod lang;
 
+pub fn db_connection(db_path: PathBuf) -> anyhow::Result<Connection> {
+    // TODO Disable Open with URI
+    let conn = Connection::open(db_path).context("Open or create database")?;
+    conn.pragma_update(None, "foreign_keys", "ON")
+        .context("Enable foreign key support")?;
+
+    conn.execute_batch(include_str!("rawr.sql"))
+        .context("Create tables if needed")?;
+
+    Ok(conn)
+}
+
+/// Core information about an upstream codebase.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Codebase {
     pub name: String,
@@ -14,11 +26,12 @@ pub struct Codebase {
     pub notes: Option<String>,
 }
 
-/// Automatically-matched item of interest. These are generally persisted to the
-/// database for tracking movement.
+/// Item of interest in the upstream codebase.
+///
+/// Uniquely identified by the codebase, revision, path, kind, and identifier.
 #[derive(Debug, Clone, Default, Eq, PartialEq)]
-pub struct Interesting {
-    // Location containing match.
+pub struct UpstreamMatch {
+    /// Name of codebase, or default if not specified.
     pub codebase: String,
     pub revision: String,
     /// Relative path to file
@@ -35,9 +48,13 @@ pub struct Interesting {
     pub identifier: String,
 
     // Hash details
+    /// Name of algorithm used to hash body of the element.
     pub hash_algorithm: String,
+
+    /// Optional salt for hash to mitigate rainbow attacks.
     pub salt: Option<u64>,
-    /// Hash of matched data. Matched data is not stored, as it can be retrieved
+
+    /// Hash of matched data for faster lookup. Original data can be retrieved
     /// from the repository.
     pub hash: String,
 
@@ -47,20 +64,8 @@ pub struct Interesting {
     pub notes: Option<String>,
 }
 
-pub fn db_connection(db_path: PathBuf) -> anyhow::Result<Connection> {
-    // TODO Disable Open with URI
-    let conn = Connection::open(db_path).context("Open or create database")?;
-    conn.pragma_update(None, "foreign_keys", "ON")
-        .context("Enable foreign key support")?;
-
-    conn.execute_batch(include_str!("rawr.sql"))
-        .context("Create tables if needed")?;
-
-    Ok(conn)
-}
-
-impl Interesting {
-    /// Insert into database via prepared statemet
+impl UpstreamMatch {
+    /// Insert into database via prepared statement
     pub fn insert(&self, db: &Connection) -> anyhow::Result<usize> {
         // language=sqlite
         let mut statement = db.prepare_cached(
@@ -212,32 +217,58 @@ WHERE codebase = :codebase
     }
 }
 
-/// Corresponds to the fields of the RAWR annotation.
-/// Look up (codebase, revision, path, kind, identifier) tuple in database to
-/// find salt, then compute local checksum for comparison.
+/// Points at an UpstreamMatch in the database.
+///
+/// Built from annotations on the downstream codebase and used to search for
+/// changes in the upstream codebase.
+///
+/// Corresponds to the (not yet defined) fields of the RAWR annotation.
+/// Look up `(codebase, revision, path, kind, identifier)` tuple in database to
+/// find current information, including salt, then compute local checksum for
+/// comparison.
 // Pain point: Finding the item that an annotation is connected to. This might
 // not be a problem, as we're only looking at the referenced item in the current
 // and new revision.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Watched {
+    /// Identifier for upstream codebase
     pub codebase: String,
+
+    /// Last-seen revision within upstream repository
     pub revision: String,
 
+    /// Path to file within upstream codebase's repository
     pub path: Option<String>,
+
+    /// Type of matched item, specific to the Tree-Sitter grammar.
     pub kind: Option<String>,
+
+    /// Identifier for named item
     pub identifier: Option<String>,
 
+    /// User-facing implementation action to take.
+    ///
+    /// Special-case for case-insensitive `IGNORE`, in default workflow.
+    ///
+    /// DESIGN Should this be an enum? What other states could be useful?
+    pub action: Option<String>,
+
+    /// Human-friendly notes on the item in question.
     pub notes: Option<String>,
-    // TODO Optional checksum to avoid lookup?
+
+    /// Optional checksum to avoid recomputation during lookup.
+    pub checksum: Option<String>,
 }
 
+/// Represent the type of change to an item in a given revision
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub enum Change {
-    Added,
-    Deleted,
-    Moved,
-    Modified,
-    WhitespaceOnly,
+    /// Item has been created
+    Add,
+    /// Item has been deleted
+    Delete,
+    /// Item contents have changed
+    Modify,
+    /// Whitespace changes only
+    Whitespace,
 }
-
-pub type Changes = HashSet<Change>;

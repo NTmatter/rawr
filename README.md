@@ -6,5 +6,6 @@ RAWR leverages Tree-Sitter to track points of interest in the upstream codebase,
 
 # Reference
 * [Tree-Sitter](https://tree-sitter.github.io/): Extract representation of codebases.
+  * [Playground](https://tree-sitter.github.io/tree-sitter/7-playground.html)
 * [Byron/gitoxide](https://github.com/Byron/gitoxide): Traverse repositories to identify changes.
 * [git-notes](https://git-scm.com/docs/git-notes): Add custom metadata and annotations to git commits.

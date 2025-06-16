@@ -10,7 +10,7 @@ use gix::bstr::BString;
 use gix::traverse::tree::Recorder;
 use gix::{Blob, Id, ObjectId, Repository};
 use rawr::lang::{Bash, LanguageMatcher, MatchType, Matcher, Rust, SupportedLanguage};
-use rawr::{db_connection, Interesting};
+use rawr::{db_connection, UpstreamMatch};
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
@@ -61,7 +61,7 @@ fn main() -> anyhow::Result<()> {
     let db = db_connection(db_path)?;
 
     // TODO Consider a concurrent hashmap
-    let mut cache: HashMap<MemoKey, Vec<Interesting>> = HashMap::new();
+    let mut cache: HashMap<MemoKey, Vec<UpstreamMatch>> = HashMap::new();
 
     // TODO Iterate over all heads
     let head = heads
@@ -78,7 +78,7 @@ fn main() -> anyhow::Result<()> {
 fn process_head(
     repo: Repository,
     db: &Connection,
-    cache: &mut HashMap<MemoKey, Vec<Interesting>>,
+    cache: &mut HashMap<MemoKey, Vec<UpstreamMatch>>,
     head: &str,
 ) -> anyhow::Result<()> {
     let rev = repo
@@ -150,7 +150,7 @@ fn process_head(
                     );
                     // Fixup potentially cached revisions
                     for result in results {
-                        let result = Interesting {
+                        let result = UpstreamMatch {
                             revision: revision.to_string(),
                             ..result.clone()
                         };
@@ -181,7 +181,11 @@ fn process_head(
 /// extension, and chooses the corresponding extractor.
 ///
 /// TODO Extract language detection and matcher selection. Use file-format or infer crate.
-fn find_matches_in_blob(path: &BString, rev: Id, blob: &Blob) -> anyhow::Result<Vec<Interesting>> {
+fn find_matches_in_blob(
+    path: &BString,
+    rev: Id,
+    blob: &Blob,
+) -> anyhow::Result<Vec<UpstreamMatch>> {
     let path = path.to_string();
     let path = Path::new(&path);
 
@@ -216,7 +220,7 @@ fn find_matches_in_blob(path: &BString, rev: Id, blob: &Blob) -> anyhow::Result<
         .expect("Parse file");
 
     // Find matches
-    let mut interesting_matches = Vec::<Interesting>::new();
+    let mut interesting_matches = Vec::<UpstreamMatch>::new();
     for matcher in &matchers {
         // Find matches and extract information
         let query = match Query::new(&language, matcher.query.as_str()) {
@@ -285,10 +289,10 @@ fn blob_hashes(contents: &[u8]) -> (String, String, Option<String>) {
     (hash_algorithm, hash, hash_stripped)
 }
 
-fn match_whole_file(path: &BString, rev: Id, blob: &Blob) -> Interesting {
+fn match_whole_file(path: &BString, rev: Id, blob: &Blob) -> UpstreamMatch {
     let (hash_algorithm, hash, hash_stripped) = blob_hashes(&blob.data);
 
-    Interesting {
+    UpstreamMatch {
         codebase: "(self)".to_string(),
         revision: rev.to_string(),
         path: path.to_string(),
@@ -312,7 +316,7 @@ fn process_match(
     source_bytes: &[u8],
     matcher: &Matcher,
     matched: &QueryMatch,
-) -> Option<Interesting> {
+) -> Option<UpstreamMatch> {
     let root_match = matched.captures.first()?;
 
     let file_path = path.to_string_lossy();
@@ -400,7 +404,7 @@ fn process_match(
     let start_byte = root_match.node.start_byte() as u64;
     let length = (root_match.node.end_byte() - root_match.node.start_byte()) as u64;
 
-    Some(Interesting {
+    Some(UpstreamMatch {
         codebase: codebase.to_string(),
         revision: revision.to_string(),
         path: file_path.to_string(),
