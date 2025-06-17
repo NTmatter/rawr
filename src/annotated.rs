@@ -2,13 +2,32 @@
 
 //! Tools for matching and extracting information from RAWR Annotations.
 
-/// Tree-Sitter query for Rust
-// language=
+/// Tree-Sitter query for `rawr` annotations.
+///
+/// RESEARCH Is it possible to extract the repeated ident/literal matches?
+///
+/// It might be necessary to build a state machine that starts a new object
+/// upon finding an identifier, collecting literals into a map. Not too complex.
 pub const RAWR_QUERY: &str = r#"(attribute
   (identifier) @name (#eq? @name "rawr")
   arguments: (token_tree
-    ((identifier) @ident
+    ((identifier) @ident "="
      [(string_literal)(boolean_literal)(integer_literal)] @literal))+) @attr"#;
+
+/// Query for outer attribute, capturing arguments for a follow-up search with
+/// a simpler query and fixed bounds.
+pub const RAWR_QUERY_ATTRIBUTE: &str = r#"(attribute
+  (identifier) @name (#eq? @name "rawr")
+  arguments: (token_tree) @args)"#;
+
+/// Query for `identifier = literal` pairs inside arguments token tree.
+pub const RAWR_QUERY_ARGS: &str =
+    r#"((identifier) @ident "=" [(string_literal)(boolean_literal)(integer_literal)] @literal)"#;
+
+// How will this be destructured? It might be necessary to do a two-part search
+// to identify the relevant attribute then pull apart the token tree idents and
+// literals in a second pass. I believe that Tree-Sitter allows for searching
+// within matches, which should take care of a lot of bounds checking.
 
 /// Points at an UpstreamMatch in the database.
 ///
