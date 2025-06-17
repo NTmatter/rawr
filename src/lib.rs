@@ -4,10 +4,11 @@ use anyhow::Context;
 use rusqlite::{named_params, Connection, OptionalExtension};
 use std::path::PathBuf;
 
+pub mod annotated;
 pub mod lang;
 
 pub fn db_connection(db_path: PathBuf) -> anyhow::Result<Connection> {
-    // TODO Disable Open with URI
+    // TODO Disable Open with URI flag with `Connection::open_with_flags`
     let conn = Connection::open(db_path).context("Open or create database")?;
     conn.pragma_update(None, "foreign_keys", "ON")
         .context("Enable foreign key support")?;
@@ -61,6 +62,9 @@ pub struct UpstreamMatch {
     /// Hash of matched data with spaces stripped. Optional, in case of binary data.
     pub hash_stripped: Option<String>,
 
+    /// Human-friendly notes attached to the matched object.
+    ///
+    /// Given the automated sourcing of these matches, notes are unlikely.
     pub notes: Option<String>,
 }
 
@@ -215,49 +219,6 @@ WHERE codebase = :codebase
 
         Ok(res)
     }
-}
-
-/// Points at an UpstreamMatch in the database.
-///
-/// Built from annotations on the downstream codebase and used to search for
-/// changes in the upstream codebase.
-///
-/// Corresponds to the (not yet defined) fields of the RAWR annotation.
-/// Look up `(codebase, revision, path, kind, identifier)` tuple in database to
-/// find current information, including salt, then compute local checksum for
-/// comparison.
-// Pain point: Finding the item that an annotation is connected to. This might
-// not be a problem, as we're only looking at the referenced item in the current
-// and new revision.
-#[derive(Debug, Eq, PartialEq)]
-pub struct Watched {
-    /// Identifier for upstream codebase
-    pub codebase: String,
-
-    /// Last-seen revision within upstream repository
-    pub revision: String,
-
-    /// Path to file within upstream codebase's repository
-    pub path: Option<String>,
-
-    /// Type of matched item, specific to the Tree-Sitter grammar.
-    pub kind: Option<String>,
-
-    /// Identifier for named item
-    pub identifier: Option<String>,
-
-    /// User-facing implementation action to take.
-    ///
-    /// Special-case for case-insensitive `IGNORE`, in default workflow.
-    ///
-    /// DESIGN Should this be an enum? What other states could be useful?
-    pub action: Option<String>,
-
-    /// Human-friendly notes on the item in question.
-    pub notes: Option<String>,
-
-    /// Optional checksum to avoid recomputation during lookup.
-    pub checksum: Option<String>,
 }
 
 /// Represent the type of change to an item in a given revision

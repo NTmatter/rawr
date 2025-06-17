@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+//! Language matchers
+
 use regex::Regex;
 use serde::de;
 use serde::de::Deserialize;
@@ -124,7 +126,7 @@ impl LanguageMatcher for Rust {
                 identifier: Named("name".to_string()),
                 contents: Match,
                 notes: Some(
-                    "Function, including visibility, name, parameters, return type, and body "
+                    "Function, including visibility, name, parameters, return type, and body"
                         .to_string(),
                 ),
             },
