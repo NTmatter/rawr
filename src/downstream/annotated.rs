@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
+// SPDX-License-Identifier: Apache-2.0
+
 //! Tools for matching and extracting information from RAWR Annotations.
 
 /// Tree-Sitter query for `rawr` annotations.
@@ -71,3 +73,9 @@ pub struct Watched {
     /// Optional checksum to avoid recomputation during lookup.
     pub checksum: Option<String>,
 }
+
+/// Original location of a Watch annotation. Unclear if this will be needed,
+/// or how to extract the start point from Tree-Sitter.
+///
+/// Ultimately, this should contain the source File, Line, and Column
+pub type WatchLocation = ();

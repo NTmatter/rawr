@@ -8,7 +8,8 @@ use anyhow::{bail, Context};
 use clap::Parser;
 use gix::bstr::BStr;
 use gix::revision::walk::Info;
-use rawr::{db_connection, UpstreamMatch};
+use rawr::db_connection;
+use rawr::upstream::UpstreamMatch;
 use std::path::PathBuf;
 use tracing::{trace, warn};
 

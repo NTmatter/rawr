@@ -4,7 +4,6 @@
 //! Try to use Gix to read the tree at a particular revision and parse a file with TreeSitter.
 //! Ultimately, I'll need to look for changes to tracked items along a series of revisions.
 use gix::{self, bstr::BString, object::Kind, traverse::tree::Recorder};
-use tree_sitter::Parser;
 
 const TREEISH: &str = "main";
 fn main() -> anyhow::Result<()> {
@@ -68,11 +67,13 @@ fn main() -> anyhow::Result<()> {
     let file_data = binding.as_slice();
 
     // The raw bytes can be passed directly to Tree-Sitter.
-    let mut parser = Parser::new();
-    parser.set_language(&tree_sitter_bash::LANGUAGE.into())?;
-    let _tree = parser.parse(file_data, None).unwrap();
+    #[cfg(feature = "lang-bash")]
+    {
+        let mut parser = Parser::new();
+        parser.set_language(&tree_sitter_bash::LANGUAGE.into())?;
+        let _tree = parser.parse(file_data, None).unwrap();
 
-    println!("Successfully parsed tree");
-
+        println!("Successfully parsed tree");
+    }
     Ok(())
 }

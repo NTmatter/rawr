@@ -11,8 +11,11 @@ use std::sync::OnceLock;
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub enum SupportedLanguage {
     Rust,
+    #[cfg(feature = "lang-bash")]
     Bash,
+    // #[cfg(feature = "lang-c")]
     // C,
+    // #[cfg(feature = "lang-cpp")]
     // Cpp,
 }
 

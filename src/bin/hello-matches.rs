@@ -9,6 +9,7 @@ use streaming_iterator::StreamingIterator;
 
 use clap::Parser as ClapParser;
 use tree_sitter::{self, Parser, Query, QueryCursor, Tree};
+#[cfg(feature = "lang-bash")]
 use tree_sitter_bash;
 use tree_sitter_rust;
 
@@ -45,6 +46,7 @@ struct Args {
     #[arg(required = true)]
     rust_file: PathBuf,
 
+    #[cfg(feature = "lang-bash")]
     #[arg(required = true)]
     bash_file: PathBuf,
 }
@@ -52,14 +54,17 @@ struct Args {
 fn main() -> Result<(), io::Error> {
     let Args {
         rust_file: implementation_file,
-        bash_file: upstream_file,
+        #[cfg(feature = "lang-bash")]
+            bash_file: upstream_file,
     } = Args::parse();
 
     parse_annotations(implementation_file);
+    #[cfg(feature = "lang-bash")]
     parse_bash(upstream_file);
     Ok(())
 }
 
+#[cfg(feature = "lang-bash")]
 fn parse_bash(source_file: PathBuf) {
     println!("--- Bash ---");
     let mut parser = Parser::new();

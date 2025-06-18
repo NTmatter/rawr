@@ -7,8 +7,8 @@
 #![allow(unused_imports)]
 
 use clap::Parser as ClapParser;
-use rawr::lang::{Bash, LanguageMatcher, MatchType, Matcher, Rust, SupportedLanguage};
-use rawr::UpstreamMatch;
+use rawr::lang::{LanguageMatcher, MatchType, Matcher, Rust, SupportedLanguage};
+use rawr::upstream::UpstreamMatch;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -16,9 +16,14 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
 use tree_sitter::{Language, Parser, Query, QueryCursor, QueryMatch};
+#[cfg(feature = "lang-bash")]
 use tree_sitter_bash;
+#[cfg(feature = "lang-c")]
 use tree_sitter_c;
+#[cfg(feature = "lang-cpp")]
 use tree_sitter_cpp;
+#[cfg(feature = "lang-java")]
+use tree_sitter_java;
 use tree_sitter_rust;
 
 #[derive(ClapParser, Debug)]
@@ -34,6 +39,7 @@ fn main() -> anyhow::Result<()> {
     // Build matchers for supported languages
     let mut language_matchers = HashMap::<SupportedLanguage, Vec<Matcher>>::new();
     language_matchers.insert(SupportedLanguage::Rust, Rust::matchers());
+    #[cfg(feature = "lang-bash")]
     language_matchers.insert(SupportedLanguage::Bash, Bash::matchers());
 
     // Process known filetypes
@@ -46,6 +52,7 @@ fn main() -> anyhow::Result<()> {
 
         let lang = match file_extension.to_str() {
             Some("rs") => SupportedLanguage::Rust,
+            #[cfg(feature = "lang-bash")]
             Some("sh") => SupportedLanguage::Bash,
             _ => return,
         };
@@ -68,6 +75,7 @@ fn find_matches_in_file(
 
     let (language, matchers) = match lang {
         SupportedLanguage::Rust => (tree_sitter_rust::LANGUAGE.into(), Rust::matchers()),
+        #[cfg(feature = "lang-bash")]
         SupportedLanguage::Bash => (tree_sitter_bash::LANGUAGE.into(), Bash::matchers()),
     };
 
