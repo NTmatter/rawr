@@ -2,7 +2,7 @@
 
 use anyhow::Context;
 use clap::Args;
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::Connection;
 use std::path::PathBuf;
 use url::Url;
 

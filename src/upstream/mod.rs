@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use rusqlite::{named_params, Connection, OptionalExtension};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Item of interest in the upstream codebase.
 ///
@@ -85,7 +85,7 @@ VALUES
         db: &Connection,
         codebase: &str,
         revision: &str,
-        path: &PathBuf,
+        path: &Path,
         kind: &str,
         identifier: &str,
     ) -> anyhow::Result<Vec<Self>> {

@@ -77,12 +77,10 @@ impl<'de> Deserialize<'de> for MatchType {
             "String" => todo!(),   // String
             "Kind" => todo!(),     // usize, String
             "SubQuery" => todo!(), // usize, String
-            _ => {
-                return Err(de::Error::unknown_variant(
-                    "",
-                    &["Match", "Named", "Kind", "String", "SubQuery"],
-                ));
-            }
+            _ => Err(de::Error::unknown_variant(
+                "",
+                &["Match", "Named", "Kind", "String", "SubQuery"],
+            )),
         }
     }
 }

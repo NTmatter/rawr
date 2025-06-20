@@ -5,8 +5,9 @@
 use crate::downstream::annotated::{WatchLocation, Watched};
 use crate::DatabaseArgs;
 use clap::Args;
-use jwalk::WalkDir;
+use jwalk::{DirEntry, WalkDir};
 use std::path::PathBuf;
+use tracing::info;
 
 #[derive(Args, Debug, Clone)]
 pub struct ScanArgs {
@@ -26,70 +27,43 @@ pub async fn scan(args: ScanArgs) -> anyhow::Result<Vec<(Watched, WatchLocation)
         project_root,
     } = args;
 
-    let walk_dir = WalkDir::new(project_root).sort(true).process_read_dir(
-        |depth, path, read_dir_state, children| {
-            children.retain(|dir_entry_result| {
-                dir_entry_result
-                    .as_ref()
-                    .map(|dir_entry| {
-                        dir_entry
-                            .file_name
-                            .to_str()
-                            .map(|s| s.ends_with(".rs"))
-                            .unwrap_or(false)
-                    })
-                    .unwrap_or(false)
-            });
-        },
-    );
+    let files = enumerate_rust_files(project_root).await?;
+    info!("Found {} files to parse", files.len());
 
-    todo!()
+    Ok(Vec::new())
 }
 
-#[test]
-fn example_jwalk() {
-    use jwalk::WalkDirGeneric;
-    use std::cmp::Ordering;
+/// Find all rust files in the provided path.
+async fn enumerate_rust_files(root: PathBuf) -> anyhow::Result<Vec<DirEntry<((), ())>>> {
+    // Filter for directories and rust files
+    let walk_dir =
+        WalkDir::new(root)
+            .sort(true)
+            .process_read_dir(|depth, path, read_dir_state, children| {
+                // Early filter for directory traversal and rust files.
+                // This could be filtered post-enumeration, but leave it in for more flexibility
+                // if additional criteria arise.
+                children.retain(|dir_entry_result| {
+                    dir_entry_result
+                        .as_ref()
+                        .map(|dir_entry| {
+                            dir_entry.file_type().is_dir()
+                                || dir_entry.file_type.is_file()
+                                    && dir_entry.file_name.to_string_lossy().ends_with(".rs")
+                        })
+                        .unwrap_or(false)
+                });
+            });
 
-    let walk_dir = WalkDirGeneric::<((usize), (bool))>::new("foo").process_read_dir(
-        |depth, path, read_dir_state, children| {
-            // 1. Custom sort
-            children.sort_by(|a, b| match (a, b) {
-                (Ok(a), Ok(b)) => a.file_name.cmp(&b.file_name),
-                (Ok(_), Err(_)) => Ordering::Less,
-                (Err(_), Ok(_)) => Ordering::Greater,
-                (Err(_), Err(_)) => Ordering::Equal,
-            });
-            // 2. Custom filter
-            children.retain(|dir_entry_result| {
-                dir_entry_result
-                    .as_ref()
-                    .map(|dir_entry| {
-                        dir_entry
-                            .file_name
-                            .to_str()
-                            .map(|s| s.starts_with('.'))
-                            .unwrap_or(false)
-                    })
-                    .unwrap_or(false)
-            });
-            // 3. Custom skip
-            children.iter_mut().for_each(|dir_entry_result| {
-                if let Ok(dir_entry) = dir_entry_result {
-                    if dir_entry.depth == 2 {
-                        dir_entry.read_children_path = None;
-                    }
-                }
-            });
-            // 4. Custom state
-            // read_dir_state is the usize from the first item in the tuple.
-            *read_dir_state += 1;
-            children.first_mut().map(|dir_entry_result| {
-                if let Ok(dir_entry) = dir_entry_result {
-                    // Unpacking the dir_entry for the first child,
-                    dir_entry.client_state = true;
-                }
-            });
-        },
-    );
+    // Filter to rust files only
+    let rust_files = walk_dir
+        .into_iter()
+        .flatten()
+        .filter(|dir_entry| {
+            dir_entry.file_type().is_file()
+                && dir_entry.file_name.to_string_lossy().ends_with(".rs")
+        })
+        .collect();
+
+    Ok(rust_files)
 }

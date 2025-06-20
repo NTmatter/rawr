@@ -13,6 +13,7 @@ maintenance = { status = "experimental" }
 [dependencies]
 anyhow = "1.0.98"
 clap = { version = "4.5.40", features = ["derive"] }
+dotenv = "0.15.0"
 # TODO Add gix features = ["parallel"] and try to parallelize for larger codebases.
 gix = "0.72.1"
 jwalk = "0.8.1"
@@ -34,9 +35,10 @@ tree-sitter-rust = "0.24.0"
 url = "2.5.4"
 serde = { version = "1.0.219", features = ["derive"] }
 regex = "1.11.1"
-tracing = "0.1.41"
+tracing = { version = "0.1.41", features = ["attributes"] }
 tracing-subscriber = "0.3.19"
 streaming-iterator = "0.1.9"
+tokio = { version = "1.45.1", features = ["full"] }
 
 [dev-dependencies]
 rawr_attribute = { git = "https://github.com/NTmatter/rawr_attribute.git" }
