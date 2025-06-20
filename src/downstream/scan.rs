@@ -115,10 +115,21 @@ async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
     // Search for annotations
 
     let mut query_cursor = QueryCursor::new();
-    let matches = query_cursor.matches(&attribute_query, tree.root_node(), source_bytes.as_slice());
+    let mut matches =
+        query_cursor.matches(&attribute_query, tree.root_node(), source_bytes.as_slice());
 
-    // Process matches
-    println!("Found {} matches in file {readable_path}", matches.count());
+    // Process arguments in each annotation match.
+    while let Some(matched) = matches.next() {
+        let Some(args) = matched.captures.get(1) else {
+            // Empty annotation, missing arguments
+            continue;
+        };
+
+        let mut args_cursor = QueryCursor::new();
+        let arg_matches = args_cursor.matches(&args_query, args.node, source_bytes.as_slice());
+
+        dbg!(arg_matches.count());
+    }
 
     Ok(Vec::new())
 }

@@ -23,8 +23,7 @@ pub const RAWR_ATTRIBUTE_QUERY: &str = r#"(attribute
   arguments: (token_tree) @args)"#;
 
 /// Query for `identifier = literal` pairs inside arguments token tree.
-pub const RAWR_ATTRIBUTE_ARGS_QUERY: &str =
-    r#"((identifier) @ident "=" [(string_literal)(boolean_literal)(integer_literal)] @literal)"#;
+pub const RAWR_ATTRIBUTE_ARGS_QUERY: &str = r#"((identifier) @ident . "=" . [(string_literal)(boolean_literal)(integer_literal)] @literal)"#;
 
 // How will this be destructured? It might be necessary to do a two-part search
 // to identify the relevant attribute then pull apart the token tree idents and
