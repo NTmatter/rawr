@@ -14,8 +14,30 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::str::FromStr;
 use streaming_iterator::StreamingIterator;
-use tracing::{info, trace, warn};
+use syn::parse::Parse;
+use syn::{LitBool, LitFloat, LitInt, LitStr};
+use tracing::{error, info, trace, warn};
 use tree_sitter::{Language, Parser, Query, QueryCapture, QueryCursor};
+
+/// Tree-Sitter query for rawr attributes. Only the outermost structure is matched,
+/// while the internal arguments are matched by `RAWR_ATTRIBUTE_ARGS_QUERY` in
+/// a second processing step..
+pub const RAWR_ATTRIBUTE_QUERY: &str = r#"(attribute
+  (identifier) @name (#eq? @name "rawr")
+  arguments: (token_tree) @args)"#;
+
+/// Tree-Sitter query for `identifier = literal` pairs nested inside
+/// the arguments token tree. Only String, Boolean, Integer, and Float
+/// literals are supported.
+pub const RAWR_ATTRIBUTE_ARGS_QUERY: &str = r#"
+((identifier) @ident
+. "=" .
+[
+  (string_literal)
+  (boolean_literal)
+  (integer_literal)
+  (float_literal)
+] @literal)"#;
 
 #[derive(Args, Debug, Clone)]
 pub struct ScanArgs {
@@ -96,6 +118,7 @@ fn enumerate_rust_files(root: PathBuf) -> anyhow::Result<Vec<DirEntry<((), ())>>
 #[derive(Debug)]
 pub(crate) enum Literal {
     String(String),
+    // Char(char),
     Boolean(bool),
     Integer(i64),
     Float(f64),
@@ -105,9 +128,9 @@ pub(crate) enum Literal {
 async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
     let rust: Language = tree_sitter_rust::LANGUAGE.into();
     let attribute_query =
-        Query::new(&rust, annotated::RAWR_ATTRIBUTE_QUERY).context("Compile annotation query")?;
-    let args_query = Query::new(&rust, annotated::RAWR_ATTRIBUTE_ARGS_QUERY)
-        .context("Compile arguments query")?;
+        Query::new(&rust, RAWR_ATTRIBUTE_QUERY).context("Compile annotation query")?;
+    let args_query =
+        Query::new(&rust, RAWR_ATTRIBUTE_ARGS_QUERY).context("Compile arguments query")?;
 
     let mut parser = Parser::new();
     parser
@@ -121,7 +144,7 @@ async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
         .with_context(|| format!("Read downstream source code file at {readable_path}"))?;
     let tree = parser
         .parse(source_bytes.as_slice(), None)
-        .context("Parse file as Rust")?;
+        .context("Parse file as Rust source")?;
 
     // Search for annotations
     let mut query_cursor = QueryCursor::new();
@@ -170,27 +193,27 @@ async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
             let literal_string = String::from_utf8(literal.into())
                 .context("Rust attribute's literal must be valid UTF-8")?;
 
-            // DESIGN Parse with syn or litrs.
-            let literal = match literal_kind {
+            // Tree-Sitter types are listed after "type": "_literal" in
+            // https://github.com/tree-sitter/tree-sitter-rust/blob/master/src/node-types.json#L259
+            let literal: Literal = match literal_kind {
                 "string_literal" => {
-                    // FIXME The literal needs to be parsed as a string literal.
-                    warn!("String literals are not parsed correctly");
-                    Literal::String(literal_string)
+                    let s = syn::parse_str::<LitStr>(&literal_string)?.value();
+                    Literal::String(s)
                 }
                 "boolean_literal" => {
-                    let b = bool::from_str(&literal_string)?;
+                    let b = syn::parse_str::<LitBool>(&literal_string)?.value;
                     Literal::Boolean(b)
                 }
                 "integer_literal" => {
-                    let i = i64::from_str(&literal_string)?;
+                    let i = syn::parse_str::<LitInt>(&literal_string)?.base10_parse::<i64>()?;
                     Literal::Integer(i)
                 }
                 "float_literal" => {
-                    let f = f64::from_str(&literal_string)?;
+                    let f = syn::parse_str::<LitFloat>(&literal_string)?.base10_parse::<f64>()?;
                     Literal::Float(f)
                 }
                 kind => {
-                    trace!(kind, "Skipping unknown literal type");
+                    warn!(identifier, kind, "Skipping identifier unknown literal type");
                     continue;
                 }
             };

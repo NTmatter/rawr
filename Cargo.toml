@@ -38,6 +38,7 @@ regex = "1.11.1"
 tracing = { version = "0.1.41", features = ["attributes"] }
 tracing-subscriber = "0.3.19"
 streaming-iterator = "0.1.9"
+syn = { version = "2.0.104", default-features = false, features = ["parsing"] }
 tokio = { version = "1.45.1", features = ["full"] }
 
 [dev-dependencies]

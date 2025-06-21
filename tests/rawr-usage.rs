@@ -3,8 +3,6 @@
 #![allow(unused)]
 
 use rawr_attribute::rawr;
-// use rawr_addributes::rawr;
-// use rawr::rawr_body;
 
 fn main() {
     println!("Testing!")
