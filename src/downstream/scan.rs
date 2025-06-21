@@ -7,7 +7,6 @@ use crate::downstream::annotated::{WatchLocation, Watched};
 use crate::DatabaseArgs;
 use anyhow::{bail, Context};
 use clap::Args;
-use jwalk::{DirEntry, WalkDir};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -19,6 +18,7 @@ use syn::{LitBool, LitFloat, LitInt, LitStr};
 use thiserror::__private::AsDisplay;
 use tracing::{error, info, trace, warn};
 use tree_sitter::{Language, Parser, Query, QueryCapture, QueryCursor};
+use walkdir::{DirEntry, WalkDir};
 
 /// Tree-Sitter query for rawr attributes. Only the outermost structure is matched,
 /// while the internal arguments are matched by `RAWR_ATTRIBUTE_ARGS_QUERY` in
@@ -47,73 +47,52 @@ pub struct ScanArgs {
 
     /// Path to code root
     #[arg(default_value = "./")]
-    pub project_root: PathBuf,
+    pub downstream_root: PathBuf,
 }
 
 /// Find Rust files and parse them to identify annotations and their watched items.
 pub async fn scan(args: ScanArgs) -> anyhow::Result<Vec<Watched>> {
     let ScanArgs {
         database,
-        project_root,
+        downstream_root,
     } = args;
 
-    let readable_root = project_root.display().to_string();
-    if !project_root.exists() {
-        bail!("Scan root does not exist: {readable_root}")
+    let root_display = downstream_root.display().to_string();
+    if !downstream_root.exists() {
+        bail!("Scan root does not exist: {root_display}")
     }
-    if !(project_root.is_file() || project_root.is_dir()) {
-        bail!("Scan root is not a file or directory: {readable_root}")
+    if !(downstream_root.is_file() || downstream_root.is_dir()) {
+        bail!("Scan root is not a file or directory: {root_display}")
     }
 
-    let files = enumerate_rust_files(project_root)?;
-    info!("Found {} files to parse in {readable_root}", files.len());
-    let paths = files
-        .into_iter()
-        .map(|dir_entry| dir_entry.path())
-        .collect::<Vec<_>>();
+    let files = enumerate_rust_files(downstream_root).await?;
+    info!("Found {} files to parse in {root_display}", files.len());
 
     let mut watches = Vec::new();
-    for path in paths {
+    for path in files {
         let mut file_watches = extract_annotations(path).await?;
         watches.append(&mut file_watches);
     }
+
+    info!("Found {} watched items", watches.len());
+    dbg!(&watches);
 
     Ok(watches)
 }
 
 /// Find all rust files in the provided path.
-// DESIGN This uses a Rayon threadpool. Should this be async?
-fn enumerate_rust_files(root: PathBuf) -> anyhow::Result<Vec<DirEntry<((), ())>>> {
-    // TODO Replace jwalk with walkdir.
-    // Filter for directories and rust files
-    let walk_dir =
-        WalkDir::new(root)
-            .sort(true)
-            .process_read_dir(|depth, path, read_dir_state, children| {
-                // Early filter for directory traversal and rust files.
-                // This could be filtered post-enumeration, but leave it in for more flexibility
-                // if additional criteria arise.
-                children.retain(|dir_entry_result| {
-                    dir_entry_result
-                        .as_ref()
-                        .map(|dir_entry| {
-                            dir_entry.file_type().is_dir()
-                                || dir_entry.file_type.is_file()
-                                    && dir_entry.file_name.to_string_lossy().ends_with(".rs")
-                        })
-                        .unwrap_or(false)
-                });
-            });
-
-    // Filter to rust files only
-    let rust_files = walk_dir
+async fn enumerate_rust_files(root: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
+    let rust_files = WalkDir::new(root)
+        .sort_by_file_name()
         .into_iter()
-        .flatten()
-        .filter(|dir_entry| {
-            dir_entry.file_type().is_file()
-                && dir_entry.file_name.to_string_lossy().ends_with(".rs")
+        .filter_entry(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .is_some_and(|name| name.ends_with(".rs"))
         })
-        .collect();
+        .map(|entry_result| entry_result.map(|entry| entry.into_path()))
+        .collect::<Result<Vec<_>, _>>()?;
 
     Ok(rust_files)
 }

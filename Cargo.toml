@@ -16,7 +16,6 @@ clap = { version = "4.5.40", features = ["derive"] }
 dotenv = "0.15.0"
 # TODO Add gix features = ["parallel"] and try to parallelize for larger codebases.
 gix = "0.72.1"
-jwalk = "0.8.1"
 rand = "0.9.1"
 rusqlite = { version = "0.36.0", features = ["bundled"] }
 sha2 = "0.10.9"
@@ -41,6 +40,7 @@ streaming-iterator = "0.1.9"
 syn = { version = "2.0.104", default-features = false, features = ["parsing"] }
 tokio = { version = "1.45.1", features = ["full"] }
 thiserror = "2.0.12"
+walkdir = "2.5.0"
 
 [dev-dependencies]
 rawr_attribute = { git = "https://github.com/NTmatter/rawr_attribute.git" }
