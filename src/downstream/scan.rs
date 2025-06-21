@@ -16,6 +16,7 @@ use std::str::FromStr;
 use streaming_iterator::StreamingIterator;
 use syn::parse::Parse;
 use syn::{LitBool, LitFloat, LitInt, LitStr};
+use thiserror::__private::AsDisplay;
 use tracing::{error, info, trace, warn};
 use tree_sitter::{Language, Parser, Query, QueryCapture, QueryCursor};
 
@@ -50,7 +51,7 @@ pub struct ScanArgs {
 }
 
 /// Find Rust files and parse them to identify annotations and their watched items.
-pub async fn scan(args: ScanArgs) -> anyhow::Result<Vec<(Watched, WatchLocation)>> {
+pub async fn scan(args: ScanArgs) -> anyhow::Result<Vec<Watched>> {
     let ScanArgs {
         database,
         project_root,
@@ -71,11 +72,13 @@ pub async fn scan(args: ScanArgs) -> anyhow::Result<Vec<(Watched, WatchLocation)
         .map(|dir_entry| dir_entry.path())
         .collect::<Vec<_>>();
 
+    let mut watches = Vec::new();
     for path in paths {
-        extract_annotations(path).await?;
+        let mut file_watches = extract_annotations(path).await?;
+        watches.append(&mut file_watches);
     }
 
-    Ok(Vec::new())
+    Ok(watches)
 }
 
 /// Find all rust files in the provided path.
@@ -118,7 +121,6 @@ fn enumerate_rust_files(root: PathBuf) -> anyhow::Result<Vec<DirEntry<((), ())>>
 #[derive(Debug)]
 pub(crate) enum Literal {
     String(String),
-    // Char(char),
     Boolean(bool),
     Integer(i64),
     Float(f64),
@@ -153,6 +155,8 @@ async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
 
     // Process each annotation's arguments.
     // TODO Extract attribute parser function
+
+    let mut watches = Vec::new();
     while let Some(attribute_match) = matched_attributes.next() {
         let Some(args) = attribute_match.captures.get(1) else {
             trace!("Empty annotation. Skipping.");
@@ -193,7 +197,7 @@ async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
             let literal_string = String::from_utf8(literal.into())
                 .context("Rust attribute's literal must be valid UTF-8")?;
 
-            // Tree-Sitter types are listed after "type": "_literal" in
+            // Tree-Sitter types are listed after `"type": "_literal"` in
             // https://github.com/tree-sitter/tree-sitter-rust/blob/master/src/node-types.json#L259
             let literal: Literal = match literal_kind {
                 "string_literal" => {
@@ -221,8 +225,18 @@ async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
             args.insert(identifier, literal);
         }
 
-        dbg!(args);
+        // TODO Capture file and position in errors.
+        let watched = Watched::try_from(args)
+            .map_err(|errs| {
+                errs.iter()
+                    .map(|err| err.as_display().to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .map_err(anyhow::Error::msg)?;
+
+        watches.push(watched);
     }
 
-    Ok(Vec::new())
+    Ok(watches)
 }

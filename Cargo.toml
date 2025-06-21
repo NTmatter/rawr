@@ -40,6 +40,7 @@ tracing-subscriber = "0.3.19"
 streaming-iterator = "0.1.9"
 syn = { version = "2.0.104", default-features = false, features = ["parsing"] }
 tokio = { version = "1.45.1", features = ["full"] }
+thiserror = "2.0.12"
 
 [dev-dependencies]
 rawr_attribute = { git = "https://github.com/NTmatter/rawr_attribute.git" }
