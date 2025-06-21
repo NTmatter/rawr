@@ -14,7 +14,7 @@ fn main() {
     src = "x::y",
     rev = "abc123def",
     implemented = true,
-    notes = "It took a while to implement this, and I think it's done. Does it print the right number?"
+    notes = "It took a while to implement this, and I think it's \"done\" -- Does it print the right number?"
 )]
 fn foo(bar: usize) -> Result<(), !> {
     println!("There are {bar} lights!");

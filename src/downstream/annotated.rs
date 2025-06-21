@@ -4,6 +4,9 @@
 
 //! Tools for matching and extracting information from RAWR Annotations.
 
+use crate::downstream::scan::Literal;
+use std::collections::HashMap;
+
 /// Tree-Sitter query for `rawr` annotations.
 ///
 /// RESEARCH Is it possible to extract the repeated ident/literal matches?
@@ -71,6 +74,14 @@ pub struct Watched {
 
     /// Optional checksum to avoid recomputation during lookup.
     pub checksum: Option<String>,
+}
+
+impl TryFrom<HashMap<String, Literal>> for Watched {
+    type Error = ();
+
+    fn try_from(value: HashMap<String, Literal>) -> Result<Self, Self::Error> {
+        todo!()
+    }
 }
 
 /// Original location of a Watch annotation. Unclear if this will be needed,
