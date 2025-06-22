@@ -36,8 +36,8 @@ pub struct Watched {
     pub kind: String,
 
     // DESIGN Can this capture nested structure? X::y() vs A::y() vs F::G::y()
-    /// Identifier for named item
-    pub identifier: String,
+    /// Identifier for named items
+    pub identifier: Option<String>,
 
     /// Free-form field for optional implementation status.
     ///
@@ -156,12 +156,7 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
                 });
                 None
             }
-            None => {
-                errors.push(MissingRequiredArg {
-                    field: key.to_string(),
-                });
-                None
-            }
+            None => None,
         };
 
         // State - Optional String
@@ -239,11 +234,6 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
         let Some(kind) = kind else {
             return Err(vec![MissingRequiredArg {
                 field: "kind".to_string(),
-            }]);
-        };
-        let Some(identifier) = identifier else {
-            return Err(vec![MissingRequiredArg {
-                field: "ident".to_string(),
             }]);
         };
 
