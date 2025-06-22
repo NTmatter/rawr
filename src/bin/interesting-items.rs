@@ -7,7 +7,8 @@
 #![allow(unused_imports)]
 
 use clap::Parser as ClapParser;
-use rawr::lang::{LanguageMatcher, MatchType, Matcher, Rust, SupportedLanguage};
+use rawr::lang::rust::Rust;
+use rawr::lang::{LanguageMatcher, MatchType, Matcher, SupportedLanguage};
 use rawr::upstream::UpstreamMatch;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;

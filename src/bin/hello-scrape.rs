@@ -11,8 +11,9 @@ use gix::traverse::tree::Recorder;
 use gix::{Blob, Id, ObjectId, Repository};
 use rawr::db_connection;
 #[cfg(feature = "lang-bash")]
-use rawr::lang::Bash;
-use rawr::lang::{LanguageMatcher, MatchType, Matcher, Rust, SupportedLanguage};
+use rawr::lang::bash::Bash;
+use rawr::lang::rust::Rust;
+use rawr::lang::{LanguageMatcher, MatchType, Matcher, SupportedLanguage};
 use rawr::upstream::UpstreamMatch;
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};

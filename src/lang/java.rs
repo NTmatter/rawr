@@ -10,17 +10,23 @@
 
 #![allow(unused)]
 
+use anyhow::Context;
 use tree_sitter::{Language, Query, QueryError};
 
-pub fn queries<'a>() -> Result<&'a [Query], QueryError> {
+#[test]
+fn validate_queries() -> anyhow::Result<()> {
+    let queries = queries().context("All queries must be valid")?;
+
+    Ok(())
+}
+
+pub fn queries() -> Result<Vec<Query>, QueryError> {
     let java: Language = tree_sitter_java::LANGUAGE.into();
 
-    // This could be written as a map, but failing queries won't get a stack trace.
-    // let queries = &[CLASS_DECLARATION]
-    //     .map(|query| Query::new(&java, query))
-    //     .collect()?;
-
-    let queries = &[Query::new(&java, CLASS_DECLARATION)?];
+    let queries = [WHOLE_FILE, CLASS_DECLARATION]
+        .into_iter()
+        .map(|query| Query::new(&java, query))
+        .collect::<Result<Vec<Query>, QueryError>>()?;
 
     Ok(queries)
 }

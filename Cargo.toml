@@ -49,7 +49,7 @@ rawr_attribute = { git = "https://github.com/NTmatter/rawr_attribute.git" }
 cc = "*"
 
 [features]
-default = []
+default = ["lang-java"]
 lang-bash = ["dep:tree-sitter-bash"]
 lang-c = ["dep:tree-sitter-c"]
 lang-cpp = ["dep:tree-sitter-cpp"]
