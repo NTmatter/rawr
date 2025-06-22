@@ -6,6 +6,9 @@ The project is currently in the early poc/experimental phase, with most effort b
 Current Task:
 - `bin/upstream-items.rs`: Parse the items in a Java file and extract their name and body.
   - Review the definitions and usage of the Matchers.
+  - Are matchers generic enough to allow something like Xpath?
+    - Yes, but not Xpath itself.
+    - Might be able to use an XPath library to extract relevant matches.
 
 Next Task:
 - Persist items of interest
@@ -15,7 +18,7 @@ Terminology:
 - `Upstream Codebase`: The codebase being ported
 - `Working Codebase`: The reimplementation
 
-Binaries are being used for early prototyping:
+Examples are being used for early prototyping:
 - `hello_matches`: (DONE) Early exploration with tree-sitter.
 - `interesting_items`: (DONE) More advanced matches with tree-sitter.
 - `hello_git`: (DONE) Early exploration with the gitoxide library.

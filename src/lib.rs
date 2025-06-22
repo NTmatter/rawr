@@ -10,6 +10,7 @@ pub mod downstream;
 pub mod lang;
 pub mod upstream;
 
+// Re-export macros for library users.
 pub use rawr_macro::{Rawr, rawr, rawr_fn};
 
 #[derive(Args, Clone, Debug)]
