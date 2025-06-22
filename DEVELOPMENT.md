@@ -37,22 +37,25 @@ Examples are being used for early prototyping:
 - `hello_comparison`: (LATER) Identify items changed since recording in the working codebase.
   - What's the initial upstream codebase?
     - Use this to direct early language matchers.
-    - Netatalk: 125kloc of C. Very interesting, under active development. Mixed GPLv2, MIT, others.
-    - sdfs: 55kloc of Java. Project seems a bit dead, but is at least small. GPLv2.
-    - lustre: (rustre) 500kloc of C, GPLv2.
-    - glusterfs: (rusterfs) 500kloc of C, GPLv2.
-    - sqlite: 350kloc, mostly C. Too big for POC, and has already been done.
+    - sdfs: 55kloc of Java, GPLv2.
+      - Project seems dead, but is at least small. GPLv2.
+    - willscott/go-nfs: 5kloc of golang, Apache2.
+      - Numerous consts are defined in a single const block.
+    - ngnfs: 15kloc of C, GPLv2.
     - libtree-sitter: Core is about 18kloc of C and ~5kloc of JS. Looks MIT-licensed.
       - Requires matchers for C and JS, and shells out to Node.
         - Processing and transpiling the grammars could be problematic.
       - Might be the most viable based on size and license.
-    - SDFS looks like more fun.
-    - willscott/go-nfs: Less than 5kloc of golang, Apache2.
     - IRIS photosensitivity tester. Less than 10k lines of C++, and BSD-licensed. 
       - [Someone](https://www.reddit.com/r/rust/comments/1l6ypys/comment/mwur4rb/) wants a port of [electronicarts/IRIS](https://github.com/electronicarts/IRIS).
       - Depends on OpenCV. There are Rust bindings.
+  - Interesting, but too big for POC:
+    - Netatalk: 125kloc of C. Very interesting, under active development. Mixed GPLv2, MIT, others.
+    - lustre: (rustre) 500kloc of C, GPLv2.
+    - glusterfs: (rusterfs) 500kloc of C, GPLv2.
     - OpenCV: 500k-1M lines of C/C++. Apache2 license.
       - Could be an interesting scaling test.
+    - Ceph: 1.2-2.2 Mloc C/C++.
     - How about something smallish in Python or C#?
 
 # Notes
