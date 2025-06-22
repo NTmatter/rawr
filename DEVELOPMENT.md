@@ -16,22 +16,22 @@ Terminology:
 - `Working Codebase`: The reimplementation
 
 Binaries are being used for early prototyping:
-- `hello-matches`: (DONE) Early exploration with tree-sitter.
-- `interesting-items`: (DONE) More advanced matches with tree-sitter.
-- `hello-git`: (DONE) Early exploration with the gitoxide library.
-- `hello-topology`: (DONE) Traverse a series of commits with gitoxide.
+- `hello_matches`: (DONE) Early exploration with tree-sitter.
+- `interesting_items`: (DONE) More advanced matches with tree-sitter.
+- `hello_git`: (DONE) Early exploration with the gitoxide library.
+- `hello_topology`: (DONE) Traverse a series of commits with gitoxide.
   - Additional work is needed for topological sorting.
-- `hello-toml`: (ON-HOLD) Early prototypes of configuration file.
+- `hello_toml`: (ON-HOLD) Early prototypes of configuration file.
   - Use hard-coded matches for now, and circle back after getting more experience with scrape.
   - Will be better-informed once some data structures have been built.
-- `hello-scrape`: (WIP) Parse a hard-coded set of interesting items from an entire git repository.
+- `hello_scrape`: (WIP) Parse a hard-coded set of interesting items from an entire git repository.
   - What language and codebase should the scrape focus on?
     - Let's use Java for its structural simplicity, and run it against the SDFS codebase.
   - Need to record ignored items
-- `hello-annotations`: (NEXT) Parse annotations in the working codebase.
+- `hello_annotations`: (NEXT) Parse annotations in the working codebase.
   - Avoid playing with XML/YAML/TOML/JSON or alternative formats in comments for now.
   - Rust annotations only. Keep scope away from other languages for now.
-- `hello-comparison`: (LATER) Identify items changed since recording in the working codebase.
+- `hello_comparison`: (LATER) Identify items changed since recording in the working codebase.
   - What's the initial upstream codebase?
     - Use this to direct early language matchers.
     - Netatalk: 125kloc of C. Very interesting, under active development. Mixed GPLv2, MIT, others.
