@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-
+extern crate rawr_attribute;
 use anyhow::Context;
 use clap::Args;
 use rusqlite::Connection;
@@ -9,6 +9,13 @@ use url::Url;
 pub mod downstream;
 pub mod lang;
 pub mod upstream;
+
+pub use rawr_attribute::rawr;
+pub use rawr_attribute::Rawr;
+
+/// Empty macro for use inside functions.
+#[macro_export]
+macro_rules! rawr_fn( ($i:ident = $l:literal $(, $i_rest:ident = $l_rest:literal)* ) => {} );
 
 #[derive(Args, Clone, Debug)]
 pub struct DatabaseArgs {

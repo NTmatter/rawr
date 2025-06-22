@@ -25,7 +25,11 @@ use walkdir::{DirEntry, WalkDir};
 /// a second processing step..
 pub const RAWR_ATTRIBUTE_QUERY: &str = r#"(attribute
   (identifier) @name (#eq? @name "rawr")
-  arguments: (token_tree) @args)"#;
+  arguments: (token_tree) @args)
+(macro_invocation
+  macro: (identifier) @name (#eq? @name "rawr_fn" )
+  (token_tree) @args)
+"#;
 
 /// Tree-Sitter query for `identifier = literal` pairs nested inside
 /// the arguments token tree. Only String, Boolean, Integer, and Float

@@ -3,7 +3,9 @@
 //! Example usage of `#[rawr]` annotations.
 
 #![allow(unused)]
-use rawr_attribute::{rawr, Rawr};
+
+use rawr::{rawr, rawr_fn, Rawr};
+
 // If the grammar provides a source_file match, it can be leveraged to watch an
 // entire file for changes.
 #[rawr(
@@ -119,11 +121,12 @@ enum Foo {
     notes = "Header file"
 )]
 fn bar() {
-    // Comment?
-    /* Comment! */
-    // I need an alternate version that runs as a declarative macro
-    // for use inside function bodies.
-    // rawr!(on_statement = true);
+    rawr_fn!(
+        file = "numbers.h",
+        kind = "constant",
+        ident = "X",
+        rev = "123"
+    );
     let x = 1;
     let y = Letters::A;
 }

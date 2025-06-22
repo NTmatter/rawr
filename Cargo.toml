@@ -11,6 +11,9 @@ license = "Apache-2.0"
 maintenance = { status = "experimental" }
 
 [dependencies]
+# Re-export derive and proc macros
+rawr_attribute = { git = "https://github.com/NTmatter/rawr_attribute.git" }
+
 anyhow = "1.0.98"
 clap = { version = "4.5.40", features = ["derive"] }
 dotenv = "0.15.0"
@@ -41,9 +44,6 @@ syn = { version = "2.0.104", default-features = false, features = ["parsing"] }
 tokio = { version = "1.45.1", features = ["full"] }
 thiserror = "2.0.12"
 walkdir = "2.5.0"
-
-[dev-dependencies]
-rawr_attribute = { git = "https://github.com/NTmatter/rawr_attribute.git" }
 
 [build-dependencies]
 cc = "*"
