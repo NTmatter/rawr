@@ -12,7 +12,7 @@ maintenance = { status = "experimental" }
 
 [dependencies]
 # Re-export derive and proc macros
-rawr_attribute = { git = "https://github.com/NTmatter/rawr_attribute.git" }
+rawr_macro = { version = "0.1.0", path = "../rawr_attribute/rawr_macro" }
 
 anyhow = "1.0.98"
 clap = { version = "4.5.40", features = ["derive"] }
