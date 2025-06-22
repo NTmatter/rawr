@@ -5,9 +5,9 @@
 
 #![allow(unused, reason = "Early development")]
 
-use crate::downstream::annotated::Watched;
-use crate::upstream::UpstreamMatch;
 use crate::DatabaseArgs;
+use crate::downstream::annotated::Watched;
+use crate::upstream::matched::UpstreamMatch;
 use annotated::WatchLocation;
 use clap::{Args, Subcommand};
 use std::path::PathBuf;

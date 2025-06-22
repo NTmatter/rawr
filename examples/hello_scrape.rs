@@ -13,8 +13,8 @@ use rawr::db_connection;
 #[cfg(feature = "lang-bash")]
 use rawr::lang::bash::Bash;
 use rawr::lang::rust::Rust;
-use rawr::lang::{LanguageMatcher, MatchType, Matcher, SupportedLanguage};
-use rawr::upstream::UpstreamMatch;
+use rawr::lang::{LanguageConfig, MatchType, Matcher, SupportedLanguage};
+use rawr::upstream::matched::UpstreamMatch;
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
@@ -300,9 +300,9 @@ fn match_whole_file(path: &BString, rev: Id, blob: &Blob) -> UpstreamMatch {
     let (hash_algorithm, hash, hash_stripped) = blob_hashes(&blob.data);
 
     UpstreamMatch {
-        codebase: "(self)".to_string(),
+        upstream: "(self)".to_string(),
         revision: rev.to_string(),
-        path: path.to_string(),
+        file: path.to_string(),
         start_byte: 0,
         length: blob.data.len() as u64,
         kind: "file".to_string(),
@@ -412,9 +412,9 @@ fn process_match(
     let length = (root_match.node.end_byte() - root_match.node.start_byte()) as u64;
 
     Some(UpstreamMatch {
-        codebase: codebase.to_string(),
+        upstream: codebase.to_string(),
         revision: revision.to_string(),
-        path: file_path.to_string(),
+        file: file_path.to_string(),
         start_byte,
         length,
         kind: matcher.kind.to_string(),

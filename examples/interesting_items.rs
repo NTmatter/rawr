@@ -8,8 +8,8 @@
 
 use clap::Parser as ClapParser;
 use rawr::lang::rust::Rust;
-use rawr::lang::{LanguageMatcher, MatchType, Matcher, SupportedLanguage};
-use rawr::upstream::UpstreamMatch;
+use rawr::lang::{LanguageConfig, MatchType, Matcher, SupportedLanguage};
+use rawr::upstream::matched::UpstreamMatch;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -240,9 +240,9 @@ fn process_match(
     let length = (root_match.node.end_byte() - root_match.node.start_byte()) as u64;
 
     Some(UpstreamMatch {
-        codebase: codebase.to_string(),
+        upstream: codebase.to_string(),
         revision: revision.to_string(),
-        path: file_path.to_string(),
+        file: file_path.to_string(),
         start_byte,
         length,
         kind: matcher.kind.to_string(),

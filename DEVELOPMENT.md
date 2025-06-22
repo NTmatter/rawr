@@ -39,7 +39,8 @@ Examples are being used for early prototyping:
     - Use this to direct early language matchers.
     - Netatalk: 125kloc of C. Very interesting, under active development. Mixed GPLv2, MIT, others.
     - sdfs: 55kloc of Java. Project seems a bit dead, but is at least small. GPLv2.
-    - glusterfs: 500kloc.
+    - lustre: (rustre) 500kloc of C, GPLv2.
+    - glusterfs: (rusterfs) 500kloc of C, GPLv2.
     - sqlite: 350kloc, mostly C. Too big for POC, and has already been done.
     - libtree-sitter: Core is about 18kloc of C and ~5kloc of JS. Looks MIT-licensed.
       - Requires matchers for C and JS, and shells out to Node.

@@ -1,198 +1,71 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use rusqlite::{named_params, Connection, OptionalExtension};
-use std::path::{Path, PathBuf};
+use crate::lang::LanguageConfig;
+use crate::upstream::matched::UpstreamMatch;
+use std::path::PathBuf;
+use url::Url;
 
-/// Item of interest in the upstream codebase.
-///
-/// Uniquely identified by the codebase, revision, path, kind, and identifier.
-#[derive(Debug, Clone, Default, Eq, PartialEq)]
-pub struct UpstreamMatch {
-    /// Name of codebase, or default if not specified.
-    pub codebase: String,
-    pub revision: String,
-    /// Relative path to file
-    pub path: String,
-    /// Offset from start of file, in bytes.
-    pub start_byte: u64,
-    /// Length of match, in bytes.
-    pub length: u64,
+pub mod matched;
+pub mod matcher;
 
-    // Type and identifier
-    /// Type of matched object
-    pub kind: String,
-    /// Identifier for object
-    pub identifier: String,
+pub type UpstreamId = String;
 
-    // Hash details
-    /// Name of algorithm used to hash body of the element.
-    pub hash_algorithm: String,
+pub struct Upstream {
+    /// Unique ID for upstream
+    pub id: UpstreamId,
 
-    /// Optional salt for hash to mitigate rainbow attacks.
-    pub salt: Option<u64>,
+    /// Human-friendly name of upstream
+    pub name: String,
 
-    /// Hash of matched data for faster lookup. Original data can be retrieved
-    /// from the repository.
-    pub hash: String,
+    /// Relative path from the current directory to upstream root
+    pub path: PathBuf,
 
-    /// Hash of matched data with spaces stripped. Optional, in case of binary data.
-    pub hash_stripped: Option<String>,
+    /// Link to the repository for display
+    pub repo: Option<Url>,
 
-    /// Human-friendly notes attached to the matched object.
-    ///
-    /// Given the automated sourcing of these matches, notes are unlikely.
+    /// List of source directories within this upstream
+    pub roots: Vec<SourceRoot>,
+
+    /// Optional human-friendly notes for this upstream
     pub notes: Option<String>,
 }
 
-impl UpstreamMatch {
-    /// Insert into database via prepared statement
-    pub fn insert(&self, db: &Connection) -> anyhow::Result<usize> {
-        // language=sqlite
-        let mut statement = db.prepare_cached(
-            r#"INSERT OR IGNORE INTO upstream
-(codebase, revision, path, start_byte, length, identifier, kind, hash_algorithm, salt, hash,
- hash_stripped, notes)
-VALUES
-(:codebase, :revision, :path, :start_byte, :length, :identifier, :kind, :hash_algorithm, :salt, :hash,
-:hash_stripped, :notes)"#,
-        )?;
-
-        let count = statement.execute(named_params! {
-            ":codebase": self.codebase,
-            ":revision": self.revision,
-            ":path": self.path,
-            ":start_byte": self.start_byte,
-            ":length": self.length,
-            ":identifier": self.identifier,
-            ":kind": self.kind,
-            ":hash_algorithm": self.hash_algorithm,
-            ":salt": self.salt,
-            ":hash": self.hash,
-            ":hash_stripped": self.hash_stripped,
-            ":notes": self.notes,
-        })?;
-
-        Ok(count)
+impl Upstream {
+    /// Collect all matched items for the given upstream configuration
+    pub async fn scan(&self) -> anyhow::Result<Vec<UpstreamMatch>> {
+        let mut matched_items = Vec::new();
+        for root in &self.roots {
+            let mut matches = root.scan(self).await?;
+            matched_items.append(&mut matches);
+        }
+        Ok(matched_items)
     }
+}
 
-    /// Retrieve metadata for an item at a particular revision.
-    ///
-    /// Does not allow handling duplicate definitions.
-    ///
-    /// DESIGN Improve handling of duplicate items (eg re-definition) within a file.
-    /// TODO Take an optional hash and/or offset.
-    pub fn get_watched_item_at_revision(
-        db: &Connection,
-        codebase: &str,
-        revision: &str,
-        path: &Path,
-        kind: &str,
-        identifier: &str,
-    ) -> anyhow::Result<Vec<Self>> {
-        // language=sqlite
-        let mut statement = db.prepare_cached(
-            "SELECT *
-FROM upstream
-WHERE codebase = :codebase
-  AND revision = :revision
-  AND path = :path
-  AND kind = :kind
-  AND identifier = :identifier",
-        )?;
+pub struct SourceRoot {
+    /// Relative path from Upstream to Source
+    pub path: PathBuf,
 
-        let mut results = Vec::new();
-        statement
-            .query_map(
-                named_params! {
-                    ":codebase": codebase,
-                    ":revision": revision,
-                    ":path": path.to_string_lossy(),
-                    ":kind": kind,
-                    ":identifier": identifier,
-                },
-                |row| {
-                    Ok(Self {
-                        codebase: row.get("codebase")?,
-                        revision: row.get("revision")?,
-                        path: row.get("path")?,
-                        start_byte: row.get("start_byte")?,
-                        length: row.get("length")?,
-                        kind: row.get("kind")?,
-                        identifier: row.get("identifier")?,
-                        hash_algorithm: row.get("hash_algorithm")?,
-                        salt: row.get("salt")?,
-                        hash: row.get("hash")?,
-                        hash_stripped: row.get("hash_stripped")?,
-                        notes: row.get("notes")?,
-                    })
-                },
-            )?
-            .try_for_each(|result| {
-                let result = result?;
-                results.push(result);
-                Ok::<(), anyhow::Error>(())
-            })?;
+    /// Language used within this source root
+    pub lang: Box<dyn LanguageConfig>,
 
-        Ok(results)
-    }
+    /// Optional human-friendly notes for this language
+    pub notes: Option<String>,
+    // TODO Includes and excludes
+}
 
-    pub fn get_one_from_db(
-        db: &Connection,
-        codebase: &str,
-        revision: &str,
-        path: PathBuf,
-        kind: &str,
-        identifier: &str,
-        salt: Option<u64>,
-        hash_algorithm: &str,
-        hash: &str,
-    ) -> anyhow::Result<Option<Self>> {
-        // language=sqlite
-        let mut statement = db.prepare_cached(
-            "SELECT *
-FROM upstream
-WHERE codebase = :codebase
-  AND revision = :revision
-  AND path = :path
-  AND kind = :kind
-  AND identifier = :identifier
-  AND hash_algorithm = :hash_algorithm
-  AND salt = :salt
-  AND hash = :hash
-  LIMIT 1",
-        )?;
+impl SourceRoot {
+    pub async fn scan(&self, upstream: &Upstream) -> anyhow::Result<Vec<UpstreamMatch>> {
+        let mut matched_items = Vec::new();
 
-        let res = statement
-            .query_row(
-                named_params! {
-                    ":codebase": codebase,
-                    ":revision": revision,
-                    ":path": path.to_string_lossy(),
-                    ":kind": kind,
-                    ":identifier": identifier,
-                    ":salt": salt,
-                    ":hash_algorithm": hash_algorithm,
-                    ":hash": hash,
-                },
-                |row| {
-                    Ok(Self {
-                        codebase: row.get("codebase")?,
-                        revision: row.get("revision")?,
-                        path: row.get("path")?,
-                        start_byte: row.get("start_byte")?,
-                        length: row.get("length")?,
-                        kind: row.get("kind")?,
-                        identifier: row.get("identifier")?,
-                        hash_algorithm: row.get("hash_algorithm")?,
-                        salt: row.get("salt")?,
-                        hash: row.get("hash")?,
-                        hash_stripped: row.get("hash_stripped")?,
-                        notes: row.get("notes")?,
-                    })
-                },
-            )
-            .optional()?;
+        let files = Vec::<PathBuf>::new();
+        // Iterate over files
+        for file in files {
+            for matcher in self.lang.matchers()? {
+                // TODO Apply matcher and add to results
+            }
+        }
 
-        Ok(res)
+        Ok(matched_items)
     }
 }

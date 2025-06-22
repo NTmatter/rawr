@@ -4,12 +4,12 @@
 //! Traverse the graph from the last accepted revision through to the
 //! target head, looking for changes in the hash and stripped hash.
 
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use clap::Parser;
 use gix::bstr::BStr;
 use gix::revision::walk::Info;
 use rawr::db_connection;
-use rawr::upstream::UpstreamMatch;
+use rawr::upstream::matched::UpstreamMatch;
 use std::path::PathBuf;
 use tracing::{trace, warn};
 

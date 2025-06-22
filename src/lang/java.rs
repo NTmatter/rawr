@@ -10,33 +10,69 @@
 
 #![allow(unused)]
 
+use crate::lang::LanguageConfig;
+use crate::upstream::matcher::Extractor::*;
+use crate::upstream::matcher::{Extractor, Matcher};
+use Extractor::*;
 use anyhow::Context;
+use std::path::PathBuf;
 use tree_sitter::{Language, Query, QueryError};
 
-#[test]
-fn validate_queries() -> anyhow::Result<()> {
-    let queries = queries().context("All queries must be valid")?;
+pub struct Java {}
+impl LanguageConfig for Java {
+    fn name(&self) -> String {
+        "Java".to_string()
+    }
 
-    Ok(())
+    fn language(&self) -> Language {
+        tree_sitter_java::LANGUAGE.into()
+    }
+
+    fn should_parse(&self, path: &PathBuf) -> anyhow::Result<bool> {
+        Ok(path.ends_with(".java"))
+    }
+
+    fn matchers(&self) -> anyhow::Result<Vec<Matcher>, QueryError> {
+        let java: Language = self.language();
+        let matchers = vec![
+            Matcher {
+                kind: "whole-file",
+                query: Query::new(&java, "(program)")?,
+                ident: Some(Constant("{filename}")),
+                notes: None,
+            },
+            Matcher {
+                kind: "class",
+                query: Query::new(&java, "(class_declaration)")?,
+                ident: None,
+                notes: None,
+            },
+            // This doesn't work for identical methods in different classes. A
+            // full in-file path is required.
+            Matcher {
+                kind: "method",
+                query: Query::new(&java, "(method_declaration)")?,
+                // Build ident from modifiers and arguments.
+                ident: Some(Subquery(
+                    Query::new(
+                        &java,
+                        "((modifiers)* @mods
+                      . type: (_) @ty
+                      . name: (identifier) @name
+                      . parameters: (formal_parameters) @params)",
+                    )?,
+                    Box::new(WholeMatch),
+                )),
+                notes: None,
+            },
+        ];
+
+        Ok(matchers)
+    }
 }
 
-pub fn queries() -> Result<Vec<Query>, QueryError> {
-    let java: Language = tree_sitter_java::LANGUAGE.into();
-
-    let queries = [WHOLE_FILE, CLASS_DECLARATION]
-        .into_iter()
-        .map(|query| Query::new(&java, query))
-        .collect::<Result<Vec<Query>, QueryError>>()?;
-
-    Ok(queries)
-}
-
-const WHOLE_FILE: &str = "(program)";
-const CLASS_DECLARATION: &str = "(class_declaration
-  name: (identifier) @name
-  body: (class_body) @contents)";
-
+// Ensure that all matchers load
 #[test]
-fn test_java_parse() -> anyhow::Result<()> {
-    Ok(())
+fn validate_matchers() {
+    Java {}.matchers().unwrap();
 }

@@ -18,10 +18,14 @@ pub enum Hash {
     Sha256([u8; 32]),
 }
 
+pub type UpstreamId = String;
 pub type NodeType = String;
 struct MatchedUpstreamItem {
     /// Identifier of upstream codebase
     upstream: String,
+
+    /// Revision of upstream codebase
+    revision: String,
 
     /// Path to file, relative to root of upstream codebase
     file: PathBuf,
@@ -55,10 +59,15 @@ struct MatchedUpstreamItem {
 /// Offsets are used to distinguish duplicate code within a file, and the
 /// type name is used to further disambiguate identical matches.
 ///
-type PrimaryKey = (usize, Hash, NodeType);
+type PrimaryKey = (UpstreamId, usize, Hash, NodeType);
 impl MatchedUpstreamItem {
     fn primary_key(&self) -> PrimaryKey {
-        (self.range.start_byte, self.hash, self.kind.clone())
+        (
+            self.upstream.clone(),
+            self.range.start_byte,
+            self.hash,
+            self.kind.clone(),
+        )
     }
 }
 
@@ -124,7 +133,7 @@ fn foo() -> anyhow::Result<()> {
     Ok(())
 }
 
-// DESIGN Is the extraction machinery really necessary? Yes, to combine type+name+parameters.ppppppp
+// DESIGN Is the extraction machinery really necessary? Yes, to combine type+name+parameters.
 /// Extract raw data from a query.
 fn extract<'data>(
     extractor: &ExtractWith,
