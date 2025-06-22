@@ -1,27 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Example usage of `#[rawr]` annotations.
+
 #![allow(unused)]
+use rawr_attribute::{rawr, Rawr};
 // If the grammar provides a source_file match, it can be leveraged to watch an
 // entire file for changes.
-#![rawr(
+#[rawr(
     file = "examples/test.cpp",
     kind = "source_file",
-    ident = "example.cpp",
     rev = "abc123",
     note = "Match a whole file to watch for any changes"
 )]
-// Upstream items can also be ignored if they are not relevant to the implementation.
-#![rawr(
+#[rawr(
     file = "images/cat.jpg",
     kind = "source_file",
-    ident = "cat.jpg",
-    rev = "000",
+    rev = "0001",
     ignore = true,
     note = "This is a CLI app, stick to emoji 😸"
 )]
+// Must be attached to a throwaway item, as inner attributes are not yet stable.
+// See rust-lang/rust#54726 for details.
+const _RAWR: () = ();
 
-use rawr_attribute::rawr;
+// Upstream items can also be ignored if they are not relevant to the implementation.
 
 fn main() {
     println!("Testing!")
@@ -32,15 +34,16 @@ fn main() {
 #[rawr(
     upstream = "the-original",
     file = "src/counter.c",
-    kind = "function"
-    ident = "light_counter(int* lights)"
+    kind = "function",
+    ident = "light_counter(int* lights)",
     rev = "bcd234",
     state = "WIP",
     action = "Testing needed",
     notes = "It took a while to implement this, and I think it's \"done\" -- Does it print the right number?"
 )]
-fn foo(bar: usize) -> Result<(), !> {
+fn foo(bar: usize) -> Result<(), String> {
     println!("There are {bar} lights!");
+
     Ok(())
 }
 
@@ -67,7 +70,8 @@ enum Letters {
     C,
 }
 
-// Upstream structs can be collected into enums that are monitored for changes.
+// Upstream constants can be collected into enums that are monitored for changes.
+#[derive(Rawr)]
 #[repr(u16)]
 enum Foo {
     #[rawr(
@@ -91,7 +95,7 @@ enum Foo {
         file = "include/constants.h",
         kind = "const",
         ident = "RELEASE_VERSION",
-        rev = "ghi456"
+        rev = "bcd456"
     )]
     Version = 2,
 }
@@ -121,4 +125,5 @@ fn bar() {
     // for use inside function bodies.
     // rawr!(on_statement = true);
     let x = 1;
+    let y = Letters::A;
 }

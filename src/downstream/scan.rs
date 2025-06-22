@@ -133,7 +133,7 @@ async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
         query_cursor.matches(&attribute_query, tree.root_node(), source_bytes.as_slice());
 
     // Process each annotation's arguments.
-    // TODO Extract attribute parser function
+    // TODO Refactor - Extract attribute parser function
 
     let mut watches = Vec::new();
     while let Some(attribute_match) = matched_attributes.next() {
