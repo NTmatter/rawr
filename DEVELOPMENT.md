@@ -4,8 +4,8 @@ As a goal, RAWR chunks and checksums upstream codebases and identifies changes w
 The project is currently in the early poc/experimental phase, with most effort being expended on learning to use the underlying libraries, building matchers and prototyping structure.
 
 Current Task:
-- Working on `bin/hello-scrape.rs`
-- Enumerate and checksum all items of interest
+- `bin/upstream-items.rs`: Parse the items in a Java file and extract their name and body.
+  - Review the definitions and usage of the Matchers.
 
 Next Task:
 - Persist items of interest
