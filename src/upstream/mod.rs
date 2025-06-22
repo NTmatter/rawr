@@ -5,9 +5,14 @@
 use crate::lang::LanguageConfig;
 use crate::lang::java::Java;
 use crate::upstream::matched::UpstreamMatch;
+use anyhow::Context;
 use std::path::PathBuf;
+use streaming_iterator::StreamingIterator;
+use tokio::fs;
+use tracing::trace;
+use tree_sitter::{Parser, QueryCursor};
 use url::Url;
-use walkdir::WalkDir;
+use walkdir::{DirEntry, WalkDir};
 
 pub mod matched;
 pub mod matcher;
@@ -65,16 +70,48 @@ impl SourceRoot {
         let root = upstream.path.join(&self.path);
         println!("Scanning {:?}", &root);
 
-        WalkDir::new(root)
+        let paths = WalkDir::new(root)
             .sort_by_file_name()
             .into_iter()
-            .for_each(|entry| println!("{:?}", entry.unwrap().path()));
+            .collect::<Result<Vec<DirEntry>, _>>()?;
 
-        let files = Vec::<PathBuf>::new();
         // Iterate over files
-        for file in files {
+        for entry in paths {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+
+            let path = entry.path().to_path_buf();
+            if !self.lang.should_parse(&path)? {
+                continue;
+            };
+            trace!(
+                path = path.to_string_lossy().to_string(),
+                lang = self.lang.name(),
+                "Parsing file"
+            );
+
+            // Stet up parser
+            let mut parser = Parser::new();
+            parser.set_language(&self.lang.language())?;
+
+            let data = fs::read(&path)
+                .await
+                .context("Read source file from disk")?;
+
+            let tree = parser.parse(&data, None).context("Parse source file")?;
             for matcher in self.lang.matchers()? {
-                // TODO Apply matcher and add to results
+                let mut cursor = QueryCursor::new();
+                let query = matcher.query;
+                let mut matches = cursor.matches(&query, tree.root_node(), data.as_slice());
+                println!(
+                    "Found {} matches for matcher {} in file {}",
+                    matches.count(),
+                    matcher.kind,
+                    path.display()
+                );
+
+                // TODO Build match objects and hand off
             }
         }
 
@@ -82,6 +119,7 @@ impl SourceRoot {
     }
 }
 
+/// Perform a scan with a hard-coded upstream
 #[tokio::test]
 async fn test_scan() -> anyhow::Result<()> {
     let cwd = std::env::current_dir()?;

@@ -29,7 +29,7 @@ impl LanguageConfig for Java {
     }
 
     fn should_parse(&self, path: &PathBuf) -> anyhow::Result<bool> {
-        Ok(path.ends_with(".java"))
+        Ok(path.to_string_lossy().ends_with(".java"))
     }
 
     fn matchers(&self) -> anyhow::Result<Vec<Matcher>, QueryError> {
