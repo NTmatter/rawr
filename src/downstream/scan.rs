@@ -2,10 +2,10 @@
 
 //! Search for file and extract information from any annotations
 
+use crate::DatabaseArgs;
 use crate::downstream::annotated;
 use crate::downstream::annotated::{WatchLocation, Watched};
-use crate::DatabaseArgs;
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use clap::Args;
 use std::collections::HashMap;
 use std::fs::File;
@@ -152,7 +152,7 @@ async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
         let mut args: HashMap<String, Literal> = HashMap::new();
         while let Some(pair_match) = arg_matches.next() {
             // Extract identifier name, if present
-            let Some(identifier) = pair_match.captures.get(0) else {
+            let Some(identifier) = pair_match.captures.first() else {
                 continue;
             };
             if identifier.node.kind() != "identifier" {

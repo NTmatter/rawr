@@ -3,7 +3,7 @@
 //! Language matchers
 
 use crate::upstream::matcher::Matcher;
-use std::path::PathBuf;
+use std::path::Path;
 use tree_sitter::{Language, QueryError};
 
 #[cfg(feature = "lang-java")]
@@ -21,7 +21,7 @@ pub trait LanguageConfig {
 
     /// Determine if file should be parsed by this matcher, typically based on
     /// file extension.
-    fn should_parse(&self, path: &PathBuf) -> bool;
+    fn should_parse(&self, path: &Path) -> bool;
 
     /// Generate a list of recognized items
     fn matchers(&self) -> anyhow::Result<Vec<Matcher>, QueryError>;

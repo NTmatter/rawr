@@ -15,7 +15,7 @@ use crate::upstream::matcher::Extractor::*;
 use crate::upstream::matcher::{Extractor, Matcher};
 use Extractor::*;
 use anyhow::Context;
-use std::path::PathBuf;
+use std::path::Path;
 use tree_sitter::{Language, Query, QueryError};
 
 pub struct Java {}
@@ -28,7 +28,7 @@ impl LanguageConfig for Java {
         tree_sitter_java::LANGUAGE.into()
     }
 
-    fn should_parse(&self, path: &PathBuf) -> bool {
+    fn should_parse(&self, path: &Path) -> bool {
         path.to_string_lossy().ends_with(".java")
     }
 
