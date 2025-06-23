@@ -39,6 +39,11 @@ Examples are being used for early prototyping:
     - Use this to direct early language matchers.
     - sdfs: 55kloc of Java, GPLv2.
       - Project seems dead, but is at least small. GPLv2.
+    - jerasure: (erasers) 4kloc C, 3-Clause BSD
+      - +3kloc of examples
+      - Build a C binding?
+      - Fuzz test against C implementation.
+      - Matrix multiplication intrinsics?
     - willscott/go-nfs: 5kloc of golang, Apache2.
       - Numerous consts are defined in a single const block.
     - ngnfs: 15kloc of C, GPLv2.

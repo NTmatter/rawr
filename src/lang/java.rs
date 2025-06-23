@@ -28,8 +28,8 @@ impl LanguageConfig for Java {
         tree_sitter_java::LANGUAGE.into()
     }
 
-    fn should_parse(&self, path: &PathBuf) -> anyhow::Result<bool> {
-        Ok(path.to_string_lossy().ends_with(".java"))
+    fn should_parse(&self, path: &PathBuf) -> bool {
+        path.to_string_lossy().ends_with(".java")
     }
 
     fn matchers(&self) -> anyhow::Result<Vec<Matcher>, QueryError> {

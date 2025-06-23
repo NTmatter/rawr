@@ -21,7 +21,7 @@ pub trait LanguageConfig {
 
     /// Determine if file should be parsed by this matcher, typically based on
     /// file extension.
-    fn should_parse(&self, path: &PathBuf) -> anyhow::Result<bool>;
+    fn should_parse(&self, path: &PathBuf) -> bool;
 
     /// Generate a list of recognized items
     fn matchers(&self) -> anyhow::Result<Vec<Matcher>, QueryError>;

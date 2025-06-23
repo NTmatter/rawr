@@ -2,7 +2,7 @@
 
 //! Functionality for matching upstream items.
 
-use tree_sitter::Query;
+use tree_sitter::{Query, QueryMatch};
 
 /// Match a class of items in an upstream codebase
 pub struct Matcher {
@@ -36,4 +36,10 @@ pub enum Extractor {
     /// Execute an additional query to identify the content, and extract it with
     /// the given extractor.
     Subquery(Query, Box<Extractor>),
+}
+
+impl Extractor {
+    pub fn extract(&self, matched: &QueryMatch, data: &[u8]) -> &[u8] {
+        todo!()
+    }
 }
