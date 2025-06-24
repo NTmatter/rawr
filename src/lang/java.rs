@@ -37,13 +37,13 @@ impl LanguageConfig for Java {
         let matchers = vec![
             Matcher {
                 kind: "whole-file",
-                query: Query::new(&java, "(program)")?,
+                query: Query::new(&java, "((program) @outer)")?,
                 ident: Some(Constant("{filename}")),
                 notes: None,
             },
             Matcher {
                 kind: "class",
-                query: Query::new(&java, "(class_declaration)")?,
+                query: Query::new(&java, "((class_declaration) @outer)")?,
                 ident: None,
                 notes: None,
             },
@@ -51,7 +51,7 @@ impl LanguageConfig for Java {
             // full in-file path is required.
             Matcher {
                 kind: "method",
-                query: Query::new(&java, "(method_declaration)")?,
+                query: Query::new(&java, "((method_declaration) @outer)")?,
                 // Build ident from modifiers and arguments.
                 ident: Some(Subquery(
                     Query::new(
@@ -63,6 +63,19 @@ impl LanguageConfig for Java {
                     )?,
                     Box::new(WholeMatch),
                 )),
+                notes: None,
+            },
+            // Temp match, just to look at behavior.
+            Matcher {
+                kind: "method-ident",
+                query: Query::new(
+                    &java,
+                    "((modifiers)* @mods
+                      . type: (_) @ty
+                      . name: (identifier) @name
+                      . parameters: (formal_parameters) @params)",
+                )?,
+                ident: None,
                 notes: None,
             },
         ];

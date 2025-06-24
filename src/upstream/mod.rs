@@ -30,7 +30,9 @@ pub struct Upstream<'t> {
     /// Human-friendly name of upstream
     pub name: String,
 
-    /// Relative path from the current directory to git repo
+    /// Path to upstream git repository.
+    ///
+    /// This can be relative or absolute to suit your environment.
     pub path: PathBuf,
 
     /// Link to the repository for display purposes
@@ -122,9 +124,10 @@ impl<'t> SourceRoot<'t> {
             .collect();
 
         println!(
-            "Found {} entries in repo at revision {}",
+            "Filtering {} entries in repo at revision {} ({})",
             entries.len(),
-            revision
+            revision,
+            rev.to_hex()
         );
         for entry in entries {
             let path = entry.filepath.to_path().context("Convert path to String")?;
@@ -137,37 +140,45 @@ impl<'t> SourceRoot<'t> {
                 continue;
             }
 
-            // Language-level path filter
+            // Language-level path filter has a final veto
             if !self.lang.should_parse(path) {
                 continue;
             };
-            trace!(
-                path = path.to_string_lossy().to_string(),
-                lang = self.lang.name(),
-                "Parsing file"
-            );
 
-            // Parse file
+            // Set up parser
             let mut parser = Parser::new();
             parser.set_language(&self.lang.language())?;
 
+            // Get data from repo blob
             let file_blob = repo
                 .find_blob(entry.oid)
                 .context("Get blob for file data")?;
             let data = &file_blob.data;
+
+            // Parse tree and extract matches
             let tree = parser.parse(data, None).context("Parse source file")?;
             for matcher in self.lang.matchers()? {
                 let mut cursor = QueryCursor::new();
                 let query = matcher.query;
+                // Should this be cursor.captures?
                 let mut matches = cursor.matches(&query, tree.root_node(), data.as_slice());
-                println!(
-                    "Found {} matches for matcher {} in file {}",
-                    matches.count(),
-                    matcher.kind,
-                    path.display()
-                );
 
-                // TODO Build match objects and append to list
+                println!("{} - {}", path.display(), matcher.kind);
+                while let Some(matched) = matches.next() {
+                    if matched.captures.is_empty() {
+                        continue;
+                    }
+
+                    // Need to find min/max bounds
+                    let start_byte = matched
+                        .captures
+                        .iter()
+                        .fold(0usize, |acc, cap| usize::min(acc, cap.node.start_byte()));
+                    let end_byte = matched.captures.iter().fold(start_byte, |acc, cap| {
+                        usize::max(acc, cap.node.start_byte())
+                    });
+                    dbg!(matched);
+                }
             }
         }
 
@@ -198,6 +209,62 @@ async fn test_scan() -> anyhow::Result<()> {
     };
 
     let results = upstream.scan("main").await?;
+    println!("Found {} results", results.len());
+    dbg!(&results);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_scan_sdfs() -> anyhow::Result<()> {
+    let cwd = std::env::current_dir()?;
+    println!("{:?}", cwd);
+
+    let upstream = Upstream {
+        id: "self-test".to_string(),
+        name: "Internal Tests".to_string(),
+        path: PathBuf::from("../../OSS/sdfs"),
+        repo: None,
+        roots: vec![SourceRoot {
+            id: "java".into(),
+            name: "Java".into(),
+            lang: Box::new(Java {}),
+            notes: None,
+            includes: vec![Glob::new("src/**/*.java")?],
+            excludes: vec![],
+        }],
+        notes: None,
+    };
+
+    let results = upstream.scan("master").await?;
+    println!("Found {} results", results.len());
+    dbg!(&results);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_scan_cassandra() -> anyhow::Result<()> {
+    let cwd = std::env::current_dir()?;
+    println!("{:?}", cwd);
+
+    let upstream = Upstream {
+        id: "self-test".to_string(),
+        name: "Internal Tests".to_string(),
+        path: PathBuf::from("../../OSS/cassandra"),
+        repo: None,
+        roots: vec![SourceRoot {
+            id: "java".into(),
+            name: "Java".into(),
+            lang: Box::new(Java {}),
+            notes: None,
+            includes: vec![Glob::new("src/**/*.java")?],
+            excludes: vec![],
+        }],
+        notes: None,
+    };
+
+    let results = upstream.scan("trunk").await?;
     println!("Found {} results", results.len());
     dbg!(&results);
 
