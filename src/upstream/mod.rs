@@ -9,6 +9,7 @@ use anyhow::{Context, bail};
 use gix::bstr::ByteSlice;
 use gix::traverse::tree::Recorder;
 use gix::traverse::tree::recorder::Entry;
+use sha2::Digest;
 use std::path::PathBuf;
 use streaming_iterator::StreamingIterator;
 use tokio::fs;
@@ -160,7 +161,7 @@ impl<'t> SourceRoot<'t> {
             for matcher in self.lang.matchers()? {
                 let mut cursor = QueryCursor::new();
                 let query = matcher.query;
-                // Should this be cursor.captures?
+
                 let mut matches = cursor.matches(&query, tree.root_node(), data.as_slice());
 
                 println!("{} - {}", path.display(), matcher.kind);
@@ -169,15 +170,20 @@ impl<'t> SourceRoot<'t> {
                         continue;
                     }
 
-                    // Need to find min/max bounds
-                    let start_byte = matched
+                    // Find outer range of captures, which might be out of order
+                    let start_byte = matched.captures.iter().fold(usize::MAX, |acc, cap| {
+                        usize::min(acc, cap.node.start_byte())
+                    });
+                    let end_byte = matched
                         .captures
                         .iter()
-                        .fold(0usize, |acc, cap| usize::min(acc, cap.node.start_byte()));
-                    let end_byte = matched.captures.iter().fold(start_byte, |acc, cap| {
-                        usize::max(acc, cap.node.start_byte())
-                    });
-                    dbg!(matched);
+                        .fold(usize::MIN, |acc, cap| usize::max(acc, cap.node.end_byte()));
+
+                    // TODO Range check
+                    let bytes = &data[start_byte..end_byte];
+                    let checksum = sha2::Sha256::digest(&bytes);
+                    println!("  {checksum:02x}")
+                    // TODO Extract ident and build Matched
                 }
             }
         }
