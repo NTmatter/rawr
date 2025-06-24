@@ -49,6 +49,7 @@ impl LanguageConfig for Java {
             },
             // This doesn't work for identical methods in different classes. A
             // full in-file path is required.
+            // PERF: Responsible for 30s of a 60s runtime on a single core.
             Matcher {
                 kind: "method",
                 query: Query::new(&java, "((method_declaration) @outer)")?,
@@ -63,19 +64,6 @@ impl LanguageConfig for Java {
                     )?,
                     Box::new(WholeMatch),
                 )),
-                notes: None,
-            },
-            // Temp match, just to look at behavior.
-            Matcher {
-                kind: "method-ident",
-                query: Query::new(
-                    &java,
-                    "((modifiers)* @mods
-                      . type: (_) @ty
-                      . name: (identifier) @name
-                      . parameters: (formal_parameters) @params)",
-                )?,
-                ident: None,
                 notes: None,
             },
         ];

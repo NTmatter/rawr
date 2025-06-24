@@ -21,6 +21,8 @@ pub trait LanguageConfig {
 
     /// Determine if file should be parsed by this matcher, typically based on
     /// file extension.
+    ///
+    /// DESIGN This should be covered by the Upstream roots' includes/excludes
     fn should_parse(&self, path: &Path) -> bool;
 
     /// Generate a list of recognized items

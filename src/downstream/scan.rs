@@ -45,7 +45,7 @@ pub const RAWR_ATTRIBUTE_ARGS_QUERY: &str = r#"
 ] @literal)"#;
 
 #[derive(Args, Debug, Clone)]
-pub struct ScanArgs {
+pub struct DownstreamScanArgs {
     #[command(flatten)]
     pub database: DatabaseArgs,
 
@@ -55,8 +55,8 @@ pub struct ScanArgs {
 }
 
 /// Find Rust files and parse them to identify annotations and their watched items.
-pub async fn scan(args: ScanArgs) -> anyhow::Result<Vec<Watched>> {
-    let ScanArgs {
+pub async fn scan(args: DownstreamScanArgs) -> anyhow::Result<Vec<Watched>> {
+    let DownstreamScanArgs {
         database,
         downstream_root,
     } = args;

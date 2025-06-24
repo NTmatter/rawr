@@ -5,15 +5,18 @@
 use anyhow::bail;
 use clap::Parser;
 use rawr::downstream;
-use rawr::downstream::scan::ScanArgs;
+use rawr::downstream::scan::DownstreamScanArgs;
+use rawr::lang::java::Java;
+use rawr::upstream::{SourceRoot, Upstream, UpstreamScanArgs};
+use wax::Glob;
 
 #[derive(Parser, Debug)]
 enum Cmd {
     /// Enumerate items in the upstream codebase(s) as per their language configurations.
-    UpstreamScan,
+    UpstreamScan(UpstreamScanArgs),
 
     /// Enumerate watched items in the downstream codebase
-    DownstreamWatches(ScanArgs),
+    DownstreamWatches(DownstreamScanArgs),
 
     /// Compare the watched items to those in the upstream
     DownstreamCompare,
@@ -34,7 +37,25 @@ async fn main() -> anyhow::Result<()> {
 
     let command = Cmd::parse();
     match command {
-        Cmd::UpstreamScan => {}
+        // XXX Use a mostly hard-coded Java scanner for early testing
+        Cmd::UpstreamScan(args) => {
+            let upstream = Upstream {
+                id: "generic-java".into(),
+                name: "Java Test".into(),
+                path: args.repo_path,
+                repo: None,
+                roots: vec![SourceRoot {
+                    id: "java".into(),
+                    name: "Java".into(),
+                    lang: Box::new(Java {}),
+                    notes: None,
+                    includes: vec![Glob::new("src/**/*.java")?],
+                    excludes: vec![],
+                }],
+                notes: Some("This should come from a config file.".into()),
+            };
+            upstream.scan(&args.revision).await?;
+        }
         Cmd::DownstreamWatches(args) => {
             downstream::scan::scan(args).await?;
         }

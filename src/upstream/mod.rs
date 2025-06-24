@@ -2,15 +2,17 @@
 
 #![allow(unused)]
 
+use crate::DatabaseArgs;
 use crate::lang::LanguageConfig;
 use crate::lang::java::Java;
 use crate::upstream::matched::UpstreamMatch;
-use anyhow::{Context, bail};
+use anyhow::{Context, Error, bail};
+use clap::Args;
 use gix::bstr::ByteSlice;
 use gix::traverse::tree::Recorder;
 use gix::traverse::tree::recorder::Entry;
 use sha2::Digest;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
 use tokio::fs;
 use tracing::{debug, trace};
@@ -23,6 +25,18 @@ pub mod matched;
 pub mod matcher;
 
 pub type UpstreamId = String;
+
+#[derive(Args, Clone, Debug)]
+pub struct UpstreamScanArgs {
+    #[command(flatten)]
+    pub database: DatabaseArgs,
+
+    /// Path to upstream Git Repository
+    pub repo_path: PathBuf,
+
+    /// Git branch or hash to scan
+    pub revision: String,
+}
 
 pub struct Upstream<'t> {
     /// Unique ID for upstream
@@ -130,9 +144,27 @@ impl<'t> SourceRoot<'t> {
             revision,
             rev.to_hex()
         );
+
+        // Threading here. Use a JoinSet and join_all
+        // Consider spawn_blocking as the entire block is synchronous, on top of the IO.
+        // https://docs.rs/tokio/latest/tokio/task/struct.JoinSet.html#method.spawn_blocking
+        //
+        // 3700 files in 90 seconds (20 seconds with --release) is Considerably more than the
+        // recommended 100µs between awaits. Blocking threads are preferred in this case.
+        //
+        // Rayon is likely the best option as matchers become more numerous and complex.
+        // https://stackoverflow.com/a/74547875/140930
+        //
+        // Further discussion referenced by the above: https://ryhl.io/blog/async-what-is-blocking/
+        // Use rayon and tokio::sync::oneshot to await the results.
+        //
+        // Use Gix Threadsafe Mode with repo.into_sync() and clone for each thread.
+        // https://docs.rs/gix/latest/gix/#threadsafe-mode
+        // https://docs.rs/gix/latest/gix/struct.ThreadSafeRepository.html
         for entry in entries {
             let path = entry.filepath.to_path().context("Convert path to String")?;
 
+            // TODO rewrite globbing with gix-glob for direct Bstr support on opaque Windows paths.
             // Upstream include/exclude filters
             if !includes.is_match(path) {
                 continue;
