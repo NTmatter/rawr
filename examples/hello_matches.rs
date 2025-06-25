@@ -234,3 +234,45 @@ pub struct Codebase {
     /// Mapping of paths to parser configurations.
     paths: HashMap<String, tree_sitter::Language>,
 }
+
+/// Brief experiment with GitOxide's built-in globbing.
+#[test]
+fn test_gix_glob() -> anyhow::Result<()> {
+    use gix_glob::Pattern;
+    use gix_glob::pattern::Mode as PatternMode;
+    use gix_glob::wildmatch;
+    use gix_glob::wildmatch::Mode as WildMatchMode;
+
+    // One-off match
+    let is_matched = wildmatch(
+        "**/*.java".into(),
+        "src/com/example/test.java".into(),
+        WildMatchMode::empty(),
+    );
+
+    dbg!(is_matched);
+
+    // Reusable pattern matcher.
+    let pattern = Pattern {
+        text: "**/*.java".into(),
+        mode: PatternMode::empty(),
+        first_wildcard_pos: Some(0),
+    };
+
+    let is_matched = pattern.matches(
+        "src/com/example/test.java".into(),
+        WildMatchMode::NO_MATCH_SLASH_LITERAL,
+    );
+    dbg!(is_matched);
+
+    // This seems to be the easiest option, syntactically.
+    let parsed = gix_glob::parse("**/*.java,js").unwrap();
+    let is_matched = parsed.matches(
+        "src/com/example/test.java".into(),
+        WildMatchMode::NO_MATCH_SLASH_LITERAL,
+    );
+
+    dbg!(is_matched);
+
+    Ok(())
+}
