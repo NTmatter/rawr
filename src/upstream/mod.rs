@@ -3,8 +3,8 @@
 #![allow(unused)]
 
 use crate::DatabaseArgs;
-use crate::lang::LanguageConfig;
 use crate::lang::java::Java;
+use crate::lang::{Dialect, LanguageDefinition};
 use crate::upstream::matched::UpstreamMatch;
 use anyhow::{Context, Error, bail};
 use clap::Args;
@@ -87,8 +87,8 @@ pub struct SourceRoot {
     /// Human-friendly name for source root
     pub name: String,
 
-    /// Language used within this source root
-    pub lang: Box<dyn LanguageConfig>,
+    /// Language and matchers used within this source root
+    pub lang: Dialect,
 
     /// Optional human-friendly notes for this language
     pub notes: Option<String>,
@@ -181,9 +181,6 @@ impl SourceRoot {
             }
 
             // Language-level path filter has a final veto
-            if !self.lang.should_parse(&entry.filepath) {
-                continue;
-            };
 
             let repo = repo_sync.clone();
             let mut matches = self.process_entry(&repo, &entry)?;
@@ -203,7 +200,7 @@ impl SourceRoot {
 
         // Set up parser
         let mut parser = Parser::new();
-        parser.set_language(&self.lang.language())?;
+        parser.set_language(&self.lang.language)?;
 
         // Get data from repo blob
         let file_blob = repo
@@ -213,9 +210,9 @@ impl SourceRoot {
 
         // Parse tree and extract matches
         let tree = parser.parse(data, None).context("Parse source file")?;
-        for matcher in self.lang.matchers()? {
+        for matcher in &self.lang.matchers {
             let mut cursor = QueryCursor::new();
-            let query = matcher.query;
+            let query = &matcher.query;
 
             let mut matches = cursor.matches(&query, tree.root_node(), data.as_slice());
 
@@ -263,7 +260,7 @@ async fn test_scan() -> anyhow::Result<()> {
         roots: vec![SourceRoot {
             id: "java".into(),
             name: "Java".into(),
-            lang: Box::new(Java {}),
+            lang: Java {}.configuration()?,
             notes: None,
             includes: vec![(
                 gix_glob::parse("tests/**/*.java").context("Glob should parse")?,
@@ -294,7 +291,7 @@ async fn test_scan_sdfs() -> anyhow::Result<()> {
         roots: vec![SourceRoot {
             id: "java".into(),
             name: "Java".into(),
-            lang: Box::new(Java {}),
+            lang: Java {}.configuration()?,
             notes: None,
             includes: vec![(
                 gix_glob::parse("src/**/*.java").context("Glob should parse")?,
@@ -325,7 +322,7 @@ async fn test_scan_cassandra() -> anyhow::Result<()> {
         roots: vec![SourceRoot {
             id: "java".into(),
             name: "Java".into(),
-            lang: Box::new(Java {}),
+            lang: Java {}.configuration()?,
             notes: None,
             includes: vec![(
                 gix_glob::parse("src/**/*.java").context("Glob should parse")?,

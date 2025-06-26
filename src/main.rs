@@ -7,6 +7,7 @@ use clap::Parser;
 use gix_glob::wildmatch::Mode;
 use rawr::downstream;
 use rawr::downstream::scan::DownstreamScanArgs;
+use rawr::lang::LanguageDefinition;
 use rawr::lang::java::Java;
 use rawr::upstream::{SourceRoot, Upstream, UpstreamScanArgs};
 
@@ -47,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
                 roots: vec![SourceRoot {
                     id: "java".into(),
                     name: "Java".into(),
-                    lang: Box::new(Java {}),
+                    lang: Java {}.configuration()?,
                     notes: None,
                     includes: vec![(
                         gix_glob::parse("src/**/*.java").context("Glob must be valid")?,
