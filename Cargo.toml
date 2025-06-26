@@ -18,7 +18,7 @@ anyhow = "1.0.98"
 clap = { version = "4.5.40", features = ["derive"] }
 dotenv = "0.15.0"
 # TODO Add gix features = ["parallel"] and try to parallelize for larger codebases.
-gix = "0.72.1"
+gix = { version = "0.72.1", features = ["parallel"] }
 rand = "0.9.1"
 rusqlite = { version = "0.36.0", features = ["bundled"] }
 sha2 = "0.10.9"
@@ -45,6 +45,7 @@ tokio = { version = "1.45.1", features = ["full"] }
 thiserror = "2.0.12"
 walkdir = "2.5.0"
 gix-glob = "0.20.1"
+rayon = "1.10.0"
 
 [build-dependencies]
 cc = "*"

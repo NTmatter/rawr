@@ -11,6 +11,7 @@ use clap::Args;
 use gix::bstr::ByteSlice;
 use gix::traverse::tree::Recorder;
 use gix::traverse::tree::recorder::Entry;
+use gix::{Repository, ThreadSafeRepository};
 use gix_glob::Pattern;
 use gix_glob::wildmatch::Mode;
 use sha2::Digest;
@@ -108,9 +109,11 @@ impl SourceRoot {
         let mut matched_items = Vec::new();
 
         let repo_path = upstream.path.clone();
-        let repo = gix::discover(&repo_path)
-            .with_context(|| format!("Open git repo at {}", &repo_path.display()))?;
+        let repo_sync = gix::open(&repo_path)
+            .with_context(|| format!("Open git repo at {}", &repo_path.display()))?
+            .into_sync();
 
+        let repo = repo_sync.clone().to_thread_local();
         let rev = repo
             .rev_parse_single(revision)
             .with_context(|| format!("Get revision for {revision}"))?;
@@ -157,9 +160,9 @@ impl SourceRoot {
         // Use Gix Threadsafe Mode with repo.into_sync() and clone for each thread.
         // https://docs.rs/gix/latest/gix/#threadsafe-mode
         // https://docs.rs/gix/latest/gix/struct.ThreadSafeRepository.html
-        for entry in entries {
-            let path = entry.filepath.to_path().context("Convert path to String")?;
 
+        // Process file entry.
+        for entry in entries {
             // TODO rewrite globbing with gix-glob for direct Bstr support on opaque Windows paths.
             // Upstream include/exclude filters
             if !self
@@ -178,53 +181,68 @@ impl SourceRoot {
             }
 
             // Language-level path filter has a final veto
-            if !self.lang.should_parse(path) {
+            if !self.lang.should_parse(&entry.filepath) {
                 continue;
             };
 
-            // Set up parser
-            let mut parser = Parser::new();
-            parser.set_language(&self.lang.language())?;
-
-            // Get data from repo blob
-            let file_blob = repo
-                .find_blob(entry.oid)
-                .context("Get blob for file data")?;
-            let data = &file_blob.data;
-
-            // Parse tree and extract matches
-            let tree = parser.parse(data, None).context("Parse source file")?;
-            for matcher in self.lang.matchers()? {
-                let mut cursor = QueryCursor::new();
-                let query = matcher.query;
-
-                let mut matches = cursor.matches(&query, tree.root_node(), data.as_slice());
-
-                println!("{} - {}", path.display(), matcher.kind);
-                while let Some(matched) = matches.next() {
-                    if matched.captures.is_empty() {
-                        continue;
-                    }
-
-                    // Find outer range of captures, which might be out of order
-                    let start_byte = matched.captures.iter().fold(usize::MAX, |acc, cap| {
-                        usize::min(acc, cap.node.start_byte())
-                    });
-                    let end_byte = matched
-                        .captures
-                        .iter()
-                        .fold(usize::MIN, |acc, cap| usize::max(acc, cap.node.end_byte()));
-
-                    // TODO Range check
-                    let bytes = &data[start_byte..end_byte];
-                    let checksum = sha2::Sha256::digest(&bytes);
-                    println!("  {checksum:02x}")
-                    // TODO Extract ident and build Matched
-                }
-            }
+            let repo = repo_sync.clone();
+            let mut matches = self.process_entry(&repo, &entry)?;
+            matched_items.append(&mut matches);
         }
 
         Ok(matched_items)
+    }
+
+    fn process_entry(
+        &self,
+        repo: &ThreadSafeRepository,
+        entry: &Entry,
+    ) -> anyhow::Result<Vec<UpstreamMatch>> {
+        let repo = repo.to_thread_local();
+        let mut matches = Vec::new();
+        let path = entry.filepath.to_path().context("Convert path to String")?;
+
+        // Set up parser
+        let mut parser = Parser::new();
+        parser.set_language(&self.lang.language())?;
+
+        // Get data from repo blob
+        let file_blob = repo
+            .find_blob(entry.oid)
+            .context("Get blob for file data")?;
+        let data = &file_blob.data;
+
+        // Parse tree and extract matches
+        let tree = parser.parse(data, None).context("Parse source file")?;
+        for matcher in self.lang.matchers()? {
+            let mut cursor = QueryCursor::new();
+            let query = matcher.query;
+
+            let mut matches = cursor.matches(&query, tree.root_node(), data.as_slice());
+
+            println!("{} - {}", path.display(), matcher.kind);
+            while let Some(matched) = matches.next() {
+                if matched.captures.is_empty() {
+                    continue;
+                }
+
+                // Find outer range of captures, which might be out of order
+                let start_byte = matched.captures.iter().fold(usize::MAX, |acc, cap| {
+                    usize::min(acc, cap.node.start_byte())
+                });
+                let end_byte = matched
+                    .captures
+                    .iter()
+                    .fold(usize::MIN, |acc, cap| usize::max(acc, cap.node.end_byte()));
+
+                // TODO Range check
+                let bytes = &data[start_byte..end_byte];
+                let checksum = sha2::Sha256::digest(&bytes);
+                println!("  {checksum:02x}")
+                // TODO Extract ident and build Matched
+            }
+        }
+        Ok(matches)
     }
 }
 

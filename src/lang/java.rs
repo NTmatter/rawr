@@ -15,6 +15,7 @@ use crate::upstream::matcher::Extractor::*;
 use crate::upstream::matcher::{Extractor, Matcher};
 use Extractor::*;
 use anyhow::Context;
+use gix::bstr::{BString, ByteSlice};
 use std::path::Path;
 use tree_sitter::{Language, Query, QueryError};
 
@@ -28,8 +29,8 @@ impl LanguageConfig for Java {
         tree_sitter_java::LANGUAGE.into()
     }
 
-    fn should_parse(&self, path: &Path) -> bool {
-        path.to_string_lossy().ends_with(".java")
+    fn should_parse(&self, path: &BString) -> bool {
+        path.to_string().ends_with(".java")
     }
 
     fn matchers(&self) -> anyhow::Result<Vec<Matcher>, QueryError> {

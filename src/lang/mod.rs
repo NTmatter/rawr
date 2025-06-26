@@ -3,7 +3,7 @@
 //! Language matchers
 
 use crate::upstream::matcher::Matcher;
-use std::path::Path;
+use gix::bstr::BString;
 use tree_sitter::{Language, QueryError};
 
 #[cfg(feature = "lang-java")]
@@ -23,7 +23,7 @@ pub trait LanguageConfig {
     /// file extension.
     ///
     /// DESIGN This should be covered by the Upstream roots' includes/excludes
-    fn should_parse(&self, path: &Path) -> bool;
+    fn should_parse(&self, path: &BString) -> bool;
 
     /// Generate a list of recognized items
     fn matchers(&self) -> anyhow::Result<Vec<Matcher>, QueryError>;
