@@ -54,6 +54,9 @@ Examples are being used for early prototyping:
     - IRIS photosensitivity tester. Less than 10k lines of C++, and BSD-licensed. 
       - [Someone](https://www.reddit.com/r/rust/comments/1l6ypys/comment/mwur4rb/) wants a port of [electronicarts/IRIS](https://github.com/electronicarts/IRIS).
       - Depends on OpenCV. There are Rust bindings.
+    - [Better Auth](https://github.com/better-auth/better-auth.git): 60kloc (core) of mixed TSX, TypeScript, YAML. MIT License.
+      - Good for building additional matchers.
+      - Learn about WASM bindings.
   - Interesting, but too big for POC:
     - Netatalk: 125kloc of C. Very interesting, under active development. Mixed GPLv2, MIT, others.
     - lustre: (rustre) 500kloc of C, GPLv2.

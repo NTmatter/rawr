@@ -9,7 +9,7 @@ pub struct Matcher {
     /// Unique name for matched kind
     pub kind: &'static str,
 
-    /// Tree-Sitter query for matching item
+    /// Tree-Sitter query for matching the full item body
     pub query: Query,
 
     /// Strategy for extracting items ident

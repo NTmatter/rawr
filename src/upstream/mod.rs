@@ -18,6 +18,7 @@ use sha2::Digest;
 use std::path::{Path, PathBuf};
 use streaming_iterator::StreamingIterator;
 use tokio::fs;
+use tokio::task::JoinSet;
 use tracing::{debug, trace};
 use tree_sitter::{Parser, QueryCursor};
 use url::Url;
@@ -163,7 +164,6 @@ impl SourceRoot {
 
         // Process file entry.
         for entry in entries {
-            // TODO rewrite globbing with gix-glob for direct Bstr support on opaque Windows paths.
             // Upstream include/exclude filters
             if !self
                 .includes
@@ -200,7 +200,6 @@ impl SourceRoot {
     ) -> anyhow::Result<Vec<UpstreamMatch>> {
         let repo = repo.to_thread_local();
         let mut matches = Vec::new();
-        let path = entry.filepath.to_path().context("Convert path to String")?;
 
         // Set up parser
         let mut parser = Parser::new();
@@ -220,7 +219,6 @@ impl SourceRoot {
 
             let mut matches = cursor.matches(&query, tree.root_node(), data.as_slice());
 
-            println!("{} - {}", path.display(), matcher.kind);
             while let Some(matched) = matches.next() {
                 if matched.captures.is_empty() {
                     continue;
@@ -238,7 +236,12 @@ impl SourceRoot {
                 // TODO Range check
                 let bytes = &data[start_byte..end_byte];
                 let checksum = sha2::Sha256::digest(&bytes);
-                println!("  {checksum:02x}")
+                trace!(
+                    kind = matcher.kind,
+                    checksum = format!("{:02x}", checksum),
+                    file = entry.filepath.to_string(),
+                    "Matched item"
+                )
                 // TODO Extract ident and build Matched
             }
         }

@@ -10,7 +10,7 @@
 
 #![allow(unused)]
 
-use crate::lang::LanguageConfig;
+use crate::lang::{ALWAYS_MATCH, Dialect, LanguageConfig, LanguageDefinition};
 use crate::upstream::matcher::Extractor::*;
 use crate::upstream::matcher::{Extractor, Matcher};
 use Extractor::*;
@@ -18,6 +18,7 @@ use anyhow::Context;
 use gix::bstr::{BString, ByteSlice};
 use std::path::Path;
 use tree_sitter::{Language, Query, QueryError};
+use tree_sitter_language::LanguageFn;
 
 pub struct Java {}
 impl LanguageConfig for Java {
@@ -50,7 +51,7 @@ impl LanguageConfig for Java {
             },
             // This doesn't work for identical methods in different classes. A
             // full in-file path is required.
-            // PERF: Responsible for 30s of a 60s runtime on a single core.
+            // PERF: Responsible for 30s of a 60s runtime on a single core (debug).
             Matcher {
                 kind: "method",
                 query: Query::new(&java, "((method_declaration) @outer)")?,
@@ -73,8 +74,58 @@ impl LanguageConfig for Java {
     }
 }
 
+impl LanguageDefinition for Java {
+    fn configuration(&self) -> anyhow::Result<Dialect, QueryError> {
+        let java: Language = tree_sitter_java::LANGUAGE.into();
+        Ok(Dialect {
+            name: "Java".into(),
+            language: tree_sitter_java::LANGUAGE.into(),
+            should_match: Some(ALWAYS_MATCH),
+            matchers: vec![
+                Matcher {
+                    kind: "whole-file",
+                    query: Query::new(&java, "((program) @body)")?,
+                    // Replace with file name for easier reference.
+                    // Also avoids storing entire contents in database.
+                    ident: Some(Constant("{filename}")),
+                    notes: None,
+                },
+                Matcher {
+                    kind: "class",
+                    query: Query::new(&java, "((class_declaration) @body)")?,
+                    ident: Some(Subquery(
+                        Query::new(&java, "(class_declaration name: (identifier) @ident)")?,
+                        Box::new(WholeMatch),
+                    )),
+                    notes: None,
+                },
+                // This doesn't work for identical methods in different classes. A
+                // full in-file path is required.
+                // PERF: Responsible for 30s of a 60s runtime on a single core.
+                Matcher {
+                    kind: "method",
+                    query: Query::new(&java, "((method_declaration) @body)")?,
+                    // Build ident from modifiers and arguments.
+                    ident: Some(Subquery(
+                        Query::new(
+                            &java,
+                            "((modifiers)* @mods
+                      . type: (_) @ty
+                      . name: (identifier) @name
+                      . parameters: (formal_parameters) @params)",
+                        )?,
+                        Box::new(WholeMatch),
+                    )),
+                    notes: None,
+                },
+            ],
+        })
+    }
+}
+
 // Ensure that all matchers load
 #[test]
 fn validate_matchers() {
     Java {}.matchers().unwrap();
+    Java {}.configuration().unwrap();
 }
