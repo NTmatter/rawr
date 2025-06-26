@@ -2,13 +2,13 @@
 
 //! Placeholder main, look at bins and lib for now.
 
-use anyhow::bail;
+use anyhow::{Context, bail};
 use clap::Parser;
+use gix_glob::wildmatch::Mode;
 use rawr::downstream;
 use rawr::downstream::scan::DownstreamScanArgs;
 use rawr::lang::java::Java;
 use rawr::upstream::{SourceRoot, Upstream, UpstreamScanArgs};
-use wax::Glob;
 
 #[derive(Parser, Debug)]
 enum Cmd {
@@ -49,7 +49,10 @@ async fn main() -> anyhow::Result<()> {
                     name: "Java".into(),
                     lang: Box::new(Java {}),
                     notes: None,
-                    includes: vec![Glob::new("src/**/*.java")?],
+                    includes: vec![(
+                        gix_glob::parse("src/**/*.java").context("Glob must be valid")?,
+                        Mode::NO_MATCH_SLASH_LITERAL,
+                    )],
                     excludes: vec![],
                 }],
                 notes: Some("This should come from a config file.".into()),
