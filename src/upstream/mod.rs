@@ -180,70 +180,75 @@ impl SourceRoot {
                 continue;
             }
 
+            if !self.lang.should_match.is_some_and(|f| f(&entry.filepath)) {
+                continue;
+            }
+
             // Language-level path filter has a final veto
 
             let repo = repo_sync.clone();
-            let mut matches = self.process_entry(&repo, &entry)?;
+            let lang = &self.lang;
+            let mut matches = process_entry(lang, &repo, &entry)?;
             matched_items.append(&mut matches);
         }
 
         Ok(matched_items)
     }
+}
 
-    fn process_entry(
-        &self,
-        repo: &ThreadSafeRepository,
-        entry: &Entry,
-    ) -> anyhow::Result<Vec<UpstreamMatch>> {
-        let repo = repo.to_thread_local();
-        let mut matches = Vec::new();
+fn process_entry(
+    lang: &Dialect,
+    repo: &ThreadSafeRepository,
+    entry: &Entry,
+) -> anyhow::Result<Vec<UpstreamMatch>> {
+    let repo = repo.to_thread_local();
+    let mut matches = Vec::new();
 
-        // Set up parser
-        let mut parser = Parser::new();
-        parser.set_language(&self.lang.language)?;
+    // Set up parser
+    let mut parser = Parser::new();
+    parser.set_language(&lang.language)?;
 
-        // Get data from repo blob
-        let file_blob = repo
-            .find_blob(entry.oid)
-            .context("Get blob for file data")?;
-        let data = &file_blob.data;
+    // Get data from repo blob
+    let file_blob = repo
+        .find_blob(entry.oid)
+        .context("Get blob for file data")?;
+    let data = &file_blob.data;
 
-        // Parse tree and extract matches
-        let tree = parser.parse(data, None).context("Parse source file")?;
-        for matcher in &self.lang.matchers {
-            let mut cursor = QueryCursor::new();
-            let query = &matcher.query;
+    // Parse tree and extract matches
+    let tree = parser.parse(data, None).context("Parse source file")?;
+    for matcher in &lang.matchers {
+        let mut cursor = QueryCursor::new();
+        let query = &matcher.query;
 
-            let mut matches = cursor.matches(&query, tree.root_node(), data.as_slice());
+        let mut matches = cursor.matches(&query, tree.root_node(), data.as_slice());
 
-            while let Some(matched) = matches.next() {
-                if matched.captures.is_empty() {
-                    continue;
-                }
-
-                // Find outer range of captures, which might be out of order
-                let start_byte = matched.captures.iter().fold(usize::MAX, |acc, cap| {
-                    usize::min(acc, cap.node.start_byte())
-                });
-                let end_byte = matched
-                    .captures
-                    .iter()
-                    .fold(usize::MIN, |acc, cap| usize::max(acc, cap.node.end_byte()));
-
-                // TODO Range check
-                let bytes = &data[start_byte..end_byte];
-                let checksum = sha2::Sha256::digest(&bytes);
-                trace!(
-                    kind = matcher.kind,
-                    checksum = format!("{:02x}", checksum),
-                    file = entry.filepath.to_string(),
-                    "Matched item"
-                )
-                // TODO Extract ident and build Matched
+        while let Some(matched) = matches.next() {
+            if matched.captures.is_empty() {
+                continue;
             }
+
+            // Find outer range of captures, which might be out of order
+            let start_byte = matched.captures.iter().fold(usize::MAX, |acc, cap| {
+                usize::min(acc, cap.node.start_byte())
+            });
+            let end_byte = matched
+                .captures
+                .iter()
+                .fold(usize::MIN, |acc, cap| usize::max(acc, cap.node.end_byte()));
+
+            // TODO Range check
+            let bytes = &data[start_byte..end_byte];
+            let checksum = sha2::Sha256::digest(&bytes);
+            trace!(
+                kind = matcher.kind,
+                checksum = format!("{:02x}", checksum),
+                file = entry.filepath.to_string(),
+                "Matched item"
+            )
+            // TODO Extract ident and build Matched
         }
-        Ok(matches)
     }
+    Ok(matches)
 }
 
 /// Perform a scan with a hard-coded upstream
