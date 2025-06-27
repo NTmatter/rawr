@@ -6,6 +6,7 @@ use crate::DatabaseArgs;
 use crate::lang::java::Java;
 use crate::lang::{Dialect, LanguageDefinition};
 use crate::upstream::matched::UpstreamMatch;
+use crate::upstream::matcher::Matcher;
 use anyhow::{Context, Error, bail};
 use clap::Args;
 use gix::bstr::ByteSlice;
@@ -16,11 +17,12 @@ use gix_glob::Pattern;
 use gix_glob::wildmatch::Mode;
 use sha2::Digest;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use streaming_iterator::StreamingIterator;
 use tokio::fs;
 use tokio::task::JoinSet;
 use tracing::{debug, trace};
-use tree_sitter::{Parser, QueryCursor};
+use tree_sitter::{Language, Parser, QueryCursor};
 use url::Url;
 use walkdir::{DirEntry, WalkDir};
 
@@ -88,7 +90,7 @@ pub struct SourceRoot {
     pub name: String,
 
     /// Language and matchers used within this source root
-    pub dialect: Dialect,
+    pub dialect: Arc<Dialect>,
 
     /// Optional human-friendly notes for this language
     pub notes: Option<String>,
@@ -163,6 +165,7 @@ impl SourceRoot {
         // https://docs.rs/gix/latest/gix/struct.ThreadSafeRepository.html
 
         // Process file entry.
+        let mut set = JoinSet::new();
         for entry in entries {
             // Upstream include/exclude filters
             if !self
@@ -180,6 +183,8 @@ impl SourceRoot {
                 continue;
             }
 
+            let dialect = Arc::clone(&self.dialect);
+
             if !self
                 .dialect
                 .should_match
@@ -191,17 +196,17 @@ impl SourceRoot {
             // Language-level path filter has a final veto
 
             let repo = repo_sync.clone();
-            let lang = &self.dialect;
-            let mut matches = process_entry(lang, &repo, &entry)?;
-            matched_items.append(&mut matches);
+
+            set.spawn(async move { process_entry(dialect, &repo, &entry) });
         }
+        set.join_all().await;
 
         Ok(matched_items)
     }
 }
 
 fn process_entry(
-    dialect: &Dialect,
+    dialect: Arc<Dialect>,
     repo: &ThreadSafeRepository,
     entry: &Entry,
 ) -> anyhow::Result<Vec<UpstreamMatch>> {
@@ -240,8 +245,9 @@ fn process_entry(
                 .iter()
                 .fold(usize::MIN, |acc, cap| usize::max(acc, cap.node.end_byte()));
 
-            // TODO Range check
-            let bytes = &data[start_byte..end_byte];
+            let bytes = data
+                .get(start_byte..end_byte)
+                .context("Byte slice range must be within slice bounds")?;
             let checksum = sha2::Sha256::digest(&bytes);
             trace!(
                 kind = matcher.kind,
@@ -269,7 +275,7 @@ async fn test_scan() -> anyhow::Result<()> {
         roots: vec![SourceRoot {
             id: "java".into(),
             name: "Java".into(),
-            dialect: Java {}.configuration()?,
+            dialect: Arc::new(Java {}.configuration()?),
             notes: None,
             includes: vec![(
                 gix_glob::parse("tests/**/*.java").context("Glob should parse")?,
@@ -300,7 +306,7 @@ async fn test_scan_sdfs() -> anyhow::Result<()> {
         roots: vec![SourceRoot {
             id: "java".into(),
             name: "Java".into(),
-            dialect: Java {}.configuration()?,
+            dialect: Arc::new(Java {}.configuration()?),
             notes: None,
             includes: vec![(
                 gix_glob::parse("src/**/*.java").context("Glob should parse")?,
@@ -331,7 +337,7 @@ async fn test_scan_cassandra() -> anyhow::Result<()> {
         roots: vec![SourceRoot {
             id: "java".into(),
             name: "Java".into(),
-            dialect: Java {}.configuration()?,
+            dialect: Arc::new(Java {}.configuration()?),
             notes: None,
             includes: vec![(
                 gix_glob::parse("src/**/*.java").context("Glob should parse")?,

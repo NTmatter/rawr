@@ -2,6 +2,7 @@
 
 //! Functionality for matching upstream items.
 
+use std::sync::Arc;
 use tree_sitter::{Query, QueryMatch};
 
 /// Match a class of items in an upstream codebase

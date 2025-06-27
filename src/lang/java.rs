@@ -17,6 +17,7 @@ use Extractor::*;
 use anyhow::Context;
 use gix::bstr::{BString, ByteSlice};
 use std::path::Path;
+use std::sync::Arc;
 use tree_sitter::{Language, Query, QueryError};
 use tree_sitter_language::LanguageFn;
 

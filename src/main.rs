@@ -10,6 +10,7 @@ use rawr::downstream::scan::DownstreamScanArgs;
 use rawr::lang::LanguageDefinition;
 use rawr::lang::java::Java;
 use rawr::upstream::{SourceRoot, Upstream, UpstreamScanArgs};
+use std::sync::Arc;
 
 #[derive(Parser, Debug)]
 enum Cmd {
@@ -48,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
                 roots: vec![SourceRoot {
                     id: "java".into(),
                     name: "Java".into(),
-                    dialect: Java {}.configuration()?,
+                    dialect: Arc::new(Java {}.configuration()?),
                     notes: None,
                     includes: vec![(
                         gix_glob::parse("src/**/*.java").context("Glob must be valid")?,
