@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
                 roots: vec![SourceRoot {
                     id: "java".into(),
                     name: "Java".into(),
-                    lang: Java {}.configuration()?,
+                    dialect: Java {}.configuration()?,
                     notes: None,
                     includes: vec![(
                         gix_glob::parse("src/**/*.java").context("Glob must be valid")?,
