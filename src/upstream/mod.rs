@@ -6,7 +6,7 @@ use crate::DatabaseArgs;
 use crate::lang::java::Java;
 use crate::lang::{Dialect, LanguageDefinition};
 use crate::upstream::matched::UpstreamMatch;
-use crate::upstream::matcher::Matcher;
+use crate::upstream::matcher::{Extractor, Matcher};
 use anyhow::{Context, Error, bail};
 use clap::Args;
 use gix::bstr::ByteSlice;
@@ -15,7 +15,7 @@ use gix::traverse::tree::recorder::Entry;
 use gix::{Repository, ThreadSafeRepository};
 use gix_glob::Pattern;
 use gix_glob::wildmatch::Mode;
-use sha2::Digest;
+use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use streaming_iterator::StreamingIterator;
@@ -236,25 +236,15 @@ fn process_entry(
                 continue;
             }
 
-            // Find outer range of captures, which might be out of order
-            let start_byte = matched.captures.iter().fold(usize::MAX, |acc, cap| {
-                usize::min(acc, cap.node.start_byte())
-            });
-            let end_byte = matched
-                .captures
-                .iter()
-                .fold(usize::MIN, |acc, cap| usize::max(acc, cap.node.end_byte()));
-
-            let bytes = data
-                .get(start_byte..end_byte)
-                .context("Byte slice range must be within slice bounds")?;
-            let checksum = sha2::Sha256::digest(&bytes);
+            // Extract full body of match and compute checksum
+            let body_checksum = Extractor::checksum_whole_match::<Sha256>(matched, data)?;
             trace!(
                 kind = matcher.kind,
-                checksum = format!("{:02x}", checksum),
+                checksum = format!("{:02x}", body_checksum),
                 file = entry.filepath.to_string(),
                 "Matched item"
             )
+
             // TODO Extract ident and build Matched
         }
     }
