@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
                     dialect: Arc::new(Java {}.configuration()?),
                     notes: None,
                     includes: vec![(
-                        gix_glob::parse("src/**/*.java").context("Glob must be valid")?,
+                        gix_glob::parse("**/*.java").context("Glob must be valid")?,
                         Mode::NO_MATCH_SLASH_LITERAL,
                     )],
                     excludes: vec![],

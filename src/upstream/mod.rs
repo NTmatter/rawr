@@ -9,7 +9,7 @@ use crate::upstream::matched::UpstreamMatch;
 use crate::upstream::matcher::{Extractor, Matcher};
 use anyhow::{Context, Error, bail};
 use clap::Args;
-use gix::bstr::ByteSlice;
+use gix::bstr::{ByteSlice, ByteVec};
 use gix::traverse::tree::Recorder;
 use gix::traverse::tree::recorder::Entry;
 use gix::{Repository, ThreadSafeRepository};
@@ -22,7 +22,7 @@ use streaming_iterator::StreamingIterator;
 use tokio::fs;
 use tokio::task::JoinSet;
 use tracing::{debug, trace};
-use tree_sitter::{Language, Parser, QueryCursor};
+use tree_sitter::{Language, Parser, Point, QueryCursor, Range};
 use url::Url;
 use walkdir::{DirEntry, WalkDir};
 
@@ -146,24 +146,6 @@ impl SourceRoot {
             rev.to_hex()
         );
 
-        // Threading here. Use a JoinSet and join_all
-        // Consider spawn_blocking as the entire block is synchronous, on top of the IO.
-        // https://docs.rs/tokio/latest/tokio/task/struct.JoinSet.html#method.spawn_blocking
-        //
-        // 3700 files in 90 seconds (20 seconds with --release) is Considerably more than the
-        // recommended 100µs between awaits. Blocking threads are preferred in this case.
-        // Gix-Glob (--release) also finishes in 20 seconds.
-        //
-        // Rayon is likely the best option as matchers become more numerous and complex.
-        // https://stackoverflow.com/a/74547875/140930
-        //
-        // Further discussion referenced by the above: https://ryhl.io/blog/async-what-is-blocking/
-        // Use rayon and tokio::sync::oneshot to await the results.
-        //
-        // Use Gix Threadsafe Mode with repo.into_sync() and clone for each thread.
-        // https://docs.rs/gix/latest/gix/#threadsafe-mode
-        // https://docs.rs/gix/latest/gix/struct.ThreadSafeRepository.html
-
         // Process file entry.
         let mut set = JoinSet::new();
         for entry in entries {
@@ -196,22 +178,37 @@ impl SourceRoot {
             // Language-level path filter has a final veto
 
             let repo = repo_sync.clone();
+            let upstream_id = upstream.id.clone();
+            let revision = revision.to_string();
 
-            set.spawn(async move { process_entry(dialect, &repo, &entry) });
+            set.spawn(
+                async move { process_entry(&upstream_id, dialect, &repo, &revision, &entry) },
+            );
         }
-        set.join_all().await;
+
+        let results = set
+            .join_all()
+            .await
+            .into_iter()
+            .collect::<anyhow::Result<Vec<Vec<UpstreamMatch>>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<UpstreamMatch>>();
+        println!("Found {} results", results.len());
 
         Ok(matched_items)
     }
 }
 
 fn process_entry(
+    upstream_id: &str,
     dialect: Arc<Dialect>,
     repo: &ThreadSafeRepository,
+    revision: &str,
     entry: &Entry,
 ) -> anyhow::Result<Vec<UpstreamMatch>> {
     let repo = repo.to_thread_local();
-    let mut matches = Vec::new();
+    let mut results = Vec::new();
 
     // Set up parser
     let mut parser = Parser::new();
@@ -236,19 +233,59 @@ fn process_entry(
                 continue;
             }
 
+            // Build outer range for match.
+            let mut range = Range {
+                start_byte: usize::MAX,
+                end_byte: usize::MIN,
+                start_point: Point::default(),
+                end_point: Point::default(),
+            };
+            for cap in matched.captures {
+                // Find the lowest start point
+                if cap.node.start_byte() <= range.start_byte {
+                    range.start_byte = cap.node.start_byte();
+                    range.start_point = cap.node.start_position();
+                }
+                // Find the highest endpoint
+                if cap.node.end_byte() >= range.end_byte {
+                    range.end_byte = cap.node.end_byte();
+                    range.end_point = cap.node.end_position();
+                }
+            }
+
             // Extract full body of match and compute checksum
             let body_checksum = Extractor::checksum_whole_match::<Sha256>(matched, data)?;
             trace!(
                 kind = matcher.kind,
+                index = matched.pattern_index,
                 checksum = format!("{:02x}", body_checksum),
                 file = entry.filepath.to_string(),
                 "Matched item"
-            )
+            );
+            let file = entry.filepath.to_path_lossy().to_path_buf();
 
-            // TODO Extract ident and build Matched
+            // Extract ident from the match body
+            let identifier = "TODO".to_string();
+
+            // Build and return match
+            let upstream_match = UpstreamMatch {
+                upstream: upstream_id.to_string(),
+                revision: revision.to_string(),
+                file,
+                range,
+                lang: dialect.name.to_string(),
+                kind: matcher.kind.to_string(),
+                identifier,
+                hash_algorithm: "sha256".to_string(),
+                hash: body_checksum.to_vec(),
+                hash_stripped: None,
+                notes: None,
+            };
+
+            results.push(upstream_match);
         }
     }
-    Ok(matches)
+    Ok(results)
 }
 
 /// Perform a scan with a hard-coded upstream

@@ -74,6 +74,16 @@ impl LanguageDefinition for Java {
 
 // Ensure that all matchers load
 #[test]
-fn validate_matchers() {
-    Java {}.configuration().unwrap();
+fn validate_matchers() -> anyhow::Result<()> {
+    let dialect = Java {}
+        .configuration()
+        .context("Should create successfully")?;
+    for matcher in dialect.matchers {
+        matcher
+            .validate()
+            .map_err(|errs| anyhow::Error::msg(errs.join("\n")))
+            .context("Matcher validation")?;
+    }
+
+    Ok(())
 }

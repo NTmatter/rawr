@@ -13,7 +13,8 @@ pub struct Matcher {
     /// Unique name for matched kind
     pub kind: &'static str,
 
-    /// Tree-Sitter query for matching the full item body
+    /// Tree-Sitter query for matching the full item body. This should have a single
+    /// top-level match, which will be used as a root for the ident extractor.
     pub query: Query,
 
     /// Strategy for extracting items ident
@@ -21,6 +22,29 @@ pub struct Matcher {
 
     /// Optional human-friendly notes about this matcher
     pub notes: Option<&'static str>,
+}
+
+impl Matcher {
+    pub fn validate(&self) -> anyhow::Result<(), Vec<&'static str>> {
+        let mut issues = Vec::new();
+
+        if self.query.pattern_count() != 1 {
+            issues.push("Body Query should have a single pattern");
+        }
+        if !self.query.is_pattern_rooted(0) {
+            issues.push("Body Query must have a single root node");
+        }
+
+        if self.query.capture_names().len() != 1 {
+            issues.push("Body Query must have a single capture named '@outer'")
+        }
+
+        if issues.is_empty() {
+            Ok(())
+        } else {
+            Err(issues)
+        }
+    }
 }
 
 /// Strategy for extracting data from a larger match.
