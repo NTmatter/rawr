@@ -255,17 +255,24 @@ fn process_entry(
 
             // Extract full body of match and compute checksum
             let body_checksum = Extractor::checksum_whole_match::<Sha256>(matched, data)?;
-            trace!(
-                kind = matcher.kind,
-                index = matched.pattern_index,
-                checksum = format!("{:02x}", body_checksum),
-                file = entry.filepath.to_string(),
-                "Matched item"
-            );
             let file = entry.filepath.to_path_lossy().to_path_buf();
 
             // Extract ident from the match body
-            let identifier = "TODO".to_string();
+            let identifier = matcher
+                .ident
+                .as_ref()
+                .map(|m| m.extract(matched, data))
+                .transpose()?
+                .map(|ident| ident.into_string_lossy())
+                .unwrap_or("(no ident)".to_string());
+
+            trace!(
+                checksum = format!("{:02x}", body_checksum),
+                file = entry.filepath.to_string(),
+                kind = matcher.kind,
+                ident = identifier,
+                "Matched item"
+            );
 
             // Build and return match
             let upstream_match = UpstreamMatch {

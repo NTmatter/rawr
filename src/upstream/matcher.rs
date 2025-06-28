@@ -6,7 +6,8 @@ use anyhow::{Context, bail};
 use sha2::digest::{Output, Update};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
-use tree_sitter::{Query, QueryMatch};
+use streaming_iterator::StreamingIterator;
+use tree_sitter::{Query, QueryCursor, QueryMatch};
 
 /// Match a class of items in an upstream codebase
 pub struct Matcher {
@@ -55,7 +56,7 @@ pub enum Extractor {
 
     /// Convert all matches to strings, normalize spaces, and join them with the
     /// given delimiter.
-    Joined(&'static str),
+    JoinNamed(&'static str),
 
     /// Supply a constant, filtered through a templating replacement.
     Constant(&'static str),
@@ -93,12 +94,14 @@ impl Extractor {
     pub fn extract<'data>(&self, outer: &QueryMatch, data: &'data [u8]) -> anyhow::Result<Vec<u8>> {
         match self {
             Extractor::WholeMatch => Self::extract_whole_match(outer, data).map(Vec::from),
-            Extractor::Joined(delimiter) => Self::extract_joined_match(outer, delimiter, data),
+            Extractor::JoinNamed(delimiter) => Self::extract_joined_match(outer, delimiter, data),
             // DESIGN How to pass down the environment for substitution? eg, Filename/Path
-            Extractor::Constant(_) => todo!(),
+            Extractor::Constant(s) => Ok(s.as_bytes().to_vec()),
             Extractor::NamedMatch(_, _) => todo!(),
             Extractor::NumberedMatch(_, _) => todo!(),
-            Extractor::Subquery(_, _) => todo!(),
+            Extractor::Subquery(subquery, extractor) => {
+                Self::extract_subquery(outer, subquery, extractor, data)
+            }
         }
     }
 
@@ -113,7 +116,7 @@ impl Extractor {
     {
         match self {
             Extractor::WholeMatch => Self::checksum_whole_match::<D>(outer, data),
-            Extractor::Joined(delimiter) => {
+            Extractor::JoinNamed(delimiter) => {
                 Self::checksum_joined_match::<D>(outer, delimiter, data)
             }
             Extractor::Constant(_) => todo!(),
@@ -159,8 +162,9 @@ impl Extractor {
         data: &'data [u8],
     ) -> anyhow::Result<Vec<u8>> {
         if outer.captures.is_empty() {
-            bail!("No matching captures found");
+            bail!("No captures to match");
         }
+
         let ranges = outer
             .captures
             .iter()
@@ -200,5 +204,27 @@ impl Extractor {
         }
 
         Ok(hasher.finalize())
+    }
+
+    // DESIGN Should subquery only act on the first node in the match?
+    pub fn extract_subquery(
+        outer: &QueryMatch,
+        subquery: &Query,
+        extractor: &Extractor,
+        data: &[u8],
+    ) -> anyhow::Result<Vec<u8>> {
+        let root_node = outer
+            .captures
+            .first()
+            .map(|capture| capture.node)
+            .context("No captures in outer match")?;
+
+        let mut cursor = QueryCursor::new();
+        let mut matches = cursor.matches(subquery, root_node, data);
+        let Some(matched) = matches.next() else {
+            bail!("No matches found");
+        };
+
+        Self::extract(extractor, matched, data)
     }
 }
