@@ -37,6 +37,7 @@ impl LanguageDefinition for Java {
                     // Replace with file name for easier reference.
                     // Also avoids storing entire contents in database.
                     ident: Some(Constant("{filename}")),
+                    excludes: None,
                     notes: None,
                 },
                 Matcher {
@@ -46,6 +47,7 @@ impl LanguageDefinition for Java {
                         Query::new(&java, "(class_declaration name: (identifier) @ident)")?,
                         Box::new(WholeMatch),
                     )),
+                    excludes: None,
                     notes: None,
                 },
                 // This doesn't work for identical methods in different classes. A
@@ -65,6 +67,7 @@ impl LanguageDefinition for Java {
                         )?,
                         Box::new(WholeMatch),
                     )),
+                    excludes: None,
                     notes: None,
                 },
                 Matcher {
@@ -79,6 +82,7 @@ impl LanguageDefinition for Java {
                         )?,
                         Box::new(WholeMatch),
                     )),
+                    excludes: None,
                     notes: None,
                 },
             ],

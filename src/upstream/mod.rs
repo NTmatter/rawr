@@ -232,6 +232,7 @@ fn process_file_entry(
     for matcher in &dialect.matchers {
         let mut cursor = QueryCursor::new();
         let query = &matcher.query;
+        let exclude_query = &matcher.excludes;
 
         let mut matches = cursor.matches(&query, tree.root_node(), data.as_slice());
 
@@ -239,6 +240,16 @@ fn process_file_entry(
             if matched.captures.is_empty() {
                 continue;
             }
+
+            // Exclude this match if the Excludes subquery is present and it produces any hits.
+            if let Some(eq) = exclude_query {
+                let mut exclude_cursor = QueryCursor::new();
+                let exclude_matches =
+                    exclude_cursor.matches(eq, matched.captures[0].node, data.as_slice());
+                if !exclude_matches.is_done() {
+                    continue;
+                }
+            };
 
             // Build outer range for match.
             let mut range = Range {

@@ -23,6 +23,9 @@ pub struct Matcher {
     /// Strategy for extracting items ident
     pub ident: Option<Extractor>,
 
+    /// Do not process if this matches the body query.
+    pub excludes: Option<Query>,
+
     /// Optional human-friendly notes about this matcher
     pub notes: Option<&'static str>,
 }

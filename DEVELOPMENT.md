@@ -4,6 +4,8 @@ As a goal, RAWR chunks and checksums upstream codebases and identifies changes w
 The project is currently in the early poc/experimental phase, with most effort being expended on learning to use the underlying libraries, building matchers and prototyping structure.
 
 Current Task:
+- Item lookup and comparison
+  - Look for changes against the upstream
 - Persist items of interest
   - How much info do I need for a unique stable ident?
 
