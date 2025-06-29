@@ -50,21 +50,32 @@ impl LanguageDefinition for Java {
                 },
                 // This doesn't work for identical methods in different classes. A
                 // full in-file path is required.
-                // PERF: Responsible for 30s of a 60s runtime on a single core.
                 Matcher {
                     kind: "method",
                     query: Query::new(&java, "((method_declaration) @body)")?,
-                    // Build ident from modifiers and arguments.
+                    // Build ident from function name and arguments. Modifiers and attributes are
+                    // captured and monitored by the body.
                     ident: Some(Subquery(
                         Query::new(
                             &java,
-                            // Workaround for multiline idents. Less idiomatic, but still readable.
                             r#"
-(method_declaration
-    name: (identifier) @name
-    . parameters: (formal_parameters) @params
-    (#strip! @params "(?ms)\\s{2,}"))
-    "#,
+                                (method_declaration
+                                    name: (identifier) @name
+                                    . parameters: (formal_parameters) @params)"#,
+                        )?,
+                        Box::new(WholeMatch),
+                    )),
+                    notes: None,
+                },
+                Matcher {
+                    kind: "field",
+                    query: Query::new(&java, "((field_declaration) @body)")?,
+                    ident: Some(Subquery(
+                        Query::new(
+                            &java,
+                            "(field_declaration
+                                        type: (_) @ty
+                                        . declarator: (variable_declarator (identifier) @name))",
                         )?,
                         Box::new(WholeMatch),
                     )),
@@ -74,8 +85,6 @@ impl LanguageDefinition for Java {
         })
     }
 }
-
-//  "(" @ob ([(formal_parameter) (spread_parameter) ","]*) @params ")" @cb
 
 // Ensure that all matchers load
 #[test]

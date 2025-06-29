@@ -182,9 +182,9 @@ impl SourceRoot {
             let upstream_id = upstream.id.clone();
             let revision = revision.to_string();
 
-            set.spawn(
-                async move { process_entry(&upstream_id, dialect, &repo, &revision, &entry) },
-            );
+            set.spawn(async move {
+                process_file_entry(&upstream_id, dialect, &repo, &revision, &entry)
+            });
         }
 
         let results = set
@@ -201,10 +201,13 @@ impl SourceRoot {
     }
 }
 
+// DESIGN Is there a way to replace runs of multiple spaces without resorting to regex?
+/// Match all instances of multiple spaces
 static IDENT_CLEANUP: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"(?m)\s+"#).expect("Ident cleanup regex must be valid"));
 
-fn process_entry(
+/// Parse file and use matchers to extract items of interest.
+fn process_file_entry(
     upstream_id: &str,
     dialect: Arc<Dialect>,
     repo: &ThreadSafeRepository,
