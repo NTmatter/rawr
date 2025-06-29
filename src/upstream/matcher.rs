@@ -18,6 +18,7 @@ pub struct Matcher {
     /// top-level match, which will be used as a root for the ident extractor.
     pub query: Query,
 
+    // TODO Ident post-processor?
     /// Strategy for extracting items ident
     pub ident: Option<Extractor>,
 

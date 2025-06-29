@@ -58,12 +58,24 @@ impl LanguageDefinition for Java {
                     ident: Some(Subquery(
                         Query::new(
                             &java,
-                            "((modifiers)* @mods
-                      . type: (_) @ty
-                      . name: (identifier) @name
-                      . parameters: (formal_parameters) @params)",
+                            // Workaround for multiline idents. Less idiomatic, but still readable.
+                            r#"
+(method_declaration ((modifiers
+    ([
+        (annotation)
+        (marker_annotation)
+        "public"
+        "protected"
+        "private"
+        "static"])* @mods)
+    . type: (_) @ty
+    . name: (identifier) @name
+    . parameters: (formal_parameters "(" @ob ([(formal_parameter) (spread_parameter) ","]*) @params ")" @cb)
+    (#strip! @params "\\s{2,}")
+    ))
+    "#,
                         )?,
-                        Box::new(WholeMatch),
+                        Box::new(JoinNamed(" ".into())),
                     )),
                     notes: None,
                 },
