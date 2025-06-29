@@ -60,22 +60,13 @@ impl LanguageDefinition for Java {
                             &java,
                             // Workaround for multiline idents. Less idiomatic, but still readable.
                             r#"
-(method_declaration ((modifiers
-    ([
-        (annotation)
-        (marker_annotation)
-        "public"
-        "protected"
-        "private"
-        "static"])* @mods)
-    . type: (_) @ty
-    . name: (identifier) @name
-    . parameters: (formal_parameters "(" @ob ([(formal_parameter) (spread_parameter) ","]*) @params ")" @cb)
-    (#strip! @params "\\s{2,}")
-    ))
+(method_declaration
+    name: (identifier) @name
+    . parameters: (formal_parameters) @params
+    (#strip! @params "(?ms)\\s{2,}"))
     "#,
                         )?,
-                        Box::new(JoinNamed(" ".into())),
+                        Box::new(WholeMatch),
                     )),
                     notes: None,
                 },
@@ -83,6 +74,8 @@ impl LanguageDefinition for Java {
         })
     }
 }
+
+//  "(" @ob ([(formal_parameter) (spread_parameter) ","]*) @params ")" @cb
 
 // Ensure that all matchers load
 #[test]

@@ -3,6 +3,7 @@
 //! Functionality for matching upstream items.
 
 use anyhow::{Context, bail};
+use gix::bstr::ByteSlice;
 use sha2::digest::{Output, Update};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
@@ -223,7 +224,10 @@ impl Extractor {
         let mut cursor = QueryCursor::new();
         let mut matches = cursor.matches(subquery, root_node, data);
         let Some(matched) = matches.next() else {
-            bail!("No matches found");
+            let ctx = Self::extract_whole_match(outer, data)
+                .map(|bytes| bytes.to_str_lossy())
+                .context("Failed to extract match")?;
+            bail!("No matches found by subquery");
         };
 
         Self::extract(extractor, matched, data)

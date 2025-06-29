@@ -15,9 +15,10 @@ use gix::traverse::tree::recorder::Entry;
 use gix::{Repository, ThreadSafeRepository};
 use gix_glob::Pattern;
 use gix_glob::wildmatch::Mode;
+use regex::Regex;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use streaming_iterator::StreamingIterator;
 use tokio::fs;
 use tokio::task::JoinSet;
@@ -200,6 +201,9 @@ impl SourceRoot {
     }
 }
 
+static IDENT_CLEANUP: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(?m)\s+"#).expect("Ident cleanup regex must be valid"));
+
 fn process_entry(
     upstream_id: &str,
     dialect: Arc<Dialect>,
@@ -264,6 +268,8 @@ fn process_entry(
                 .map(|m| m.extract(matched, data))
                 .transpose()?
                 .map(|ident| ident.into_string_lossy())
+                .map(|ident| ident.replace("\\n", ""))
+                .map(|ident| IDENT_CLEANUP.replace_all(&ident, " ").into_owned())
                 .unwrap_or("(no ident)".to_string());
 
             trace!(
@@ -273,6 +279,7 @@ fn process_entry(
                 ident = identifier,
                 "Matched item"
             );
+            println!("{identifier}");
 
             // Build and return match
             let upstream_match = UpstreamMatch {
