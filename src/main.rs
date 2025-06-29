@@ -6,6 +6,8 @@ use anyhow::{Context, bail};
 use clap::Parser;
 use gix_glob::wildmatch::Mode;
 use rawr::downstream;
+use rawr::downstream::scan;
+use rawr::downstream::scan::Downstream;
 use rawr::downstream::scan::DownstreamScanArgs;
 use rawr::lang::LanguageDefinition;
 use rawr::lang::java::Java;
@@ -62,6 +64,30 @@ async fn main() -> anyhow::Result<()> {
             upstream.scan(&args.revision).await?;
         }
         Cmd::DownstreamWatches(args) => {
+            // XXX Use a hard-coded downstream scan for source and tests
+            let downstream = Downstream {
+                name: "self".into(),
+                roots: vec![
+                    scan::SourceRoot {
+                        id: "tests".to_string(),
+                        path: "tests".into(),
+                        includes: vec![(
+                            gix_glob::parse("**/*.rs").context("Glob must be valid")?,
+                            Mode::NO_MATCH_SLASH_LITERAL,
+                        )],
+                        excludes: vec![],
+                    },
+                    scan::SourceRoot {
+                        id: "lib".to_string(),
+                        path: "src".into(),
+                        includes: vec![(
+                            gix_glob::parse("**/*.rs").context("Glob must be valid")?,
+                            Mode::NO_MATCH_SLASH_LITERAL,
+                        )],
+                        excludes: vec![],
+                    },
+                ],
+            };
             downstream::scan::scan(args).await?;
         }
         Cmd::DownstreamCompare => {}

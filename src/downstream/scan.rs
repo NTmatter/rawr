@@ -7,6 +7,8 @@ use crate::downstream::annotated::{WatchLocation, Watched};
 use crate::downstream::{Literal, annotated};
 use anyhow::{Context, bail};
 use clap::Args;
+use gix_glob::Pattern;
+use gix_glob::wildmatch::Mode;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -228,4 +230,16 @@ async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
     }
 
     Ok(watches)
+}
+
+pub struct Downstream {
+    pub name: String,
+    pub roots: Vec<SourceRoot>,
+}
+
+pub struct SourceRoot {
+    pub id: String,
+    pub path: PathBuf,
+    pub includes: Vec<(Pattern, Mode)>,
+    pub excludes: Vec<(Pattern, Mode)>,
 }

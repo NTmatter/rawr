@@ -10,8 +10,6 @@ use crate::downstream::annotated::Watched;
 use crate::upstream::matched::UpstreamMatch;
 use annotated::WatchLocation;
 use clap::{Args, Subcommand};
-use gix_glob::Pattern;
-use gix_glob::wildmatch::Mode;
 use std::path::PathBuf;
 
 pub mod annotated;
@@ -23,18 +21,6 @@ pub enum Literal {
     Boolean(bool),
     Integer(i64),
     Float(f64),
-}
-
-pub struct Downstream {
-    pub name: String,
-    pub roots: Vec<SourceRoot>,
-}
-
-pub struct SourceRoot {
-    pub id: String,
-    pub path: PathBuf,
-    pub includes: Vec<(Pattern, Mode)>,
-    pub excludes: Vec<(Pattern, Mode)>,
 }
 
 #[derive(Args, Debug, Clone)]
