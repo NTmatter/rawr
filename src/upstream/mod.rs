@@ -269,7 +269,7 @@ fn process_entry(
                 .transpose()?
                 .map(|ident| ident.into_string_lossy())
                 .map(|ident| ident.replace("\\n", ""))
-                .map(|ident| IDENT_CLEANUP.replace_all(&ident, " ").into_owned())
+                .map(|ident| IDENT_CLEANUP.replace_all(&ident, " ").trim().to_owned())
                 .unwrap_or("(no ident)".to_string());
 
             trace!(
@@ -279,7 +279,6 @@ fn process_entry(
                 ident = identifier,
                 "Matched item"
             );
-            println!("{identifier}");
 
             // Build and return match
             let upstream_match = UpstreamMatch {
