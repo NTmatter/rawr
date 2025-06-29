@@ -7,7 +7,11 @@ Current Task:
 - Item lookup and comparison
   - Look for changes against the upstream
 - Persist items of interest
+  - Defer persistence until the lookup is better-understood.
   - How much info do I need for a unique stable ident?
+  - If the scan takes less than a second, is there any point in persisting data?
+    - Probably sensible for smaller/slower machines.
+    - Allows direct lookup from third-party tools.
 
 Next Task:
 - Track movement of items of interest

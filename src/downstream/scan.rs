@@ -3,8 +3,8 @@
 //! Search for file and extract information from any annotations
 
 use crate::DatabaseArgs;
-use crate::downstream::annotated;
 use crate::downstream::annotated::{WatchLocation, Watched};
+use crate::downstream::{Literal, annotated};
 use anyhow::{Context, bail};
 use clap::Args;
 use std::collections::HashMap;
@@ -16,6 +16,7 @@ use streaming_iterator::StreamingIterator;
 use syn::parse::Parse;
 use syn::{LitBool, LitFloat, LitInt, LitStr};
 use thiserror::__private::AsDisplay;
+use tokio::task::JoinSet;
 use tracing::{error, info, trace, warn};
 use tree_sitter::{Language, Parser, Query, QueryCapture, QueryCursor};
 use walkdir::{DirEntry, WalkDir};
@@ -61,6 +62,7 @@ pub async fn scan(args: DownstreamScanArgs) -> anyhow::Result<Vec<Watched>> {
         downstream_root,
     } = args;
 
+    // Sanity check for scan root
     let root_display = downstream_root.display().to_string();
     if !downstream_root.exists() {
         bail!("Scan root does not exist: {root_display}")
@@ -72,14 +74,21 @@ pub async fn scan(args: DownstreamScanArgs) -> anyhow::Result<Vec<Watched>> {
     let files = enumerate_rust_files(downstream_root).await?;
     info!("Found {} files to parse in {root_display}", files.len());
 
-    let mut watches = Vec::new();
+    // TODO Parallelize downstream scan
+    let mut join_set = JoinSet::new();
     for path in files {
-        let mut file_watches = extract_annotations(path).await?;
-        watches.append(&mut file_watches);
+        join_set.spawn(async move { extract_annotations(path).await });
     }
 
+    let watches = join_set
+        .join_all()
+        .await
+        .into_iter()
+        .collect::<anyhow::Result<Vec<Vec<Watched>>>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<Watched>>();
     info!("Found {} watched items", watches.len());
-    dbg!(&watches);
 
     Ok(watches)
 }
@@ -89,24 +98,21 @@ async fn enumerate_rust_files(root: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
     let rust_files = WalkDir::new(root)
         .sort_by_file_name()
         .into_iter()
-        .filter_entry(|entry| {
-            entry
-                .file_name()
-                .to_str()
-                .is_some_and(|name| name.ends_with(".rs"))
+        .collect::<Result<Vec<DirEntry>, walkdir::Error>>()?
+        .iter()
+        .filter_map(|entry| {
+            // TODO Use a Downstream configuration to handle include/exclude globbing.
+            if entry.file_type().is_file()
+                && entry.path().extension().is_some_and(|ext| ext == "rs")
+            {
+                Some(entry.path().to_path_buf())
+            } else {
+                None
+            }
         })
-        .map(|entry_result| entry_result.map(|entry| entry.into_path()))
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Vec<PathBuf>>();
 
     Ok(rust_files)
-}
-
-#[derive(Debug)]
-pub(crate) enum Literal {
-    String(String),
-    Boolean(bool),
-    Integer(i64),
-    Float(f64),
 }
 
 /// Find and return annotations in file

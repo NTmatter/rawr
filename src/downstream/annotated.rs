@@ -2,7 +2,7 @@
 
 //! Tools for matching and extracting information from RAWR Annotations.
 
-use crate::downstream::scan::Literal;
+use crate::downstream::Literal;
 use std::collections::HashMap;
 use thiserror::Error;
 
