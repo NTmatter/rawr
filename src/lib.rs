@@ -32,14 +32,6 @@ pub fn db_connection(db_path: PathBuf) -> anyhow::Result<Connection> {
     Ok(conn)
 }
 
-/// Core information about an upstream codebase.
-#[derive(Debug, Eq, PartialEq)]
-pub struct Codebase {
-    pub name: String,
-    pub relative_path: String,
-    pub notes: Option<String>,
-}
-
 /// Represent the type of change to an item in a given revision
 #[derive(Debug, Hash, Eq, PartialEq)]
 pub enum Change {

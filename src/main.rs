@@ -5,7 +5,6 @@
 use anyhow::{Context, bail};
 use clap::Parser;
 use gix_glob::wildmatch::Mode;
-use rawr::downstream;
 use rawr::downstream::scan;
 use rawr::downstream::scan::Downstream;
 use rawr::downstream::scan::DownstreamScanArgs;
@@ -63,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
             };
             upstream.scan(&args.revision).await?;
         }
-        Cmd::DownstreamWatches(args) => {
+        Cmd::DownstreamWatches(_args) => {
             // XXX Use a hard-coded downstream scan for source and tests
             let downstream = Downstream {
                 name: "self".into(),
@@ -88,7 +87,7 @@ async fn main() -> anyhow::Result<()> {
                     },
                 ],
             };
-            downstream::scan::scan(args).await?;
+            downstream.scan().await?;
         }
         Cmd::DownstreamCompare => {}
     }

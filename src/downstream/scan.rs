@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! Search for file and extract information from any annotations
+// DESIGN find and match with language machinery, parse matches with syn.
 
 use crate::DatabaseArgs;
 use crate::downstream::annotated::{WatchLocation, Watched};
 use crate::downstream::{Literal, annotated};
 use anyhow::{Context, bail};
 use clap::Args;
+use gix::bstr::BStr;
 use gix_glob::Pattern;
 use gix_glob::wildmatch::Mode;
 use std::collections::HashMap;
@@ -19,7 +21,7 @@ use syn::parse::Parse;
 use syn::{LitBool, LitFloat, LitInt, LitStr};
 use thiserror::__private::AsDisplay;
 use tokio::task::JoinSet;
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use tree_sitter::{Language, Parser, Query, QueryCapture, QueryCursor};
 use walkdir::{DirEntry, WalkDir};
 
@@ -57,48 +59,100 @@ pub struct DownstreamScanArgs {
     pub downstream_root: PathBuf,
 }
 
-/// Find Rust files and parse them to identify annotations and their watched items.
-pub async fn scan(args: DownstreamScanArgs) -> anyhow::Result<Vec<Watched>> {
-    let DownstreamScanArgs {
-        database,
-        downstream_root,
-    } = args;
+pub struct Downstream {
+    pub name: String,
+    pub roots: Vec<SourceRoot>,
+}
 
-    // Sanity check for scan root
-    let root_display = downstream_root.display().to_string();
-    if !downstream_root.exists() {
-        bail!("Scan root does not exist: {root_display}")
+impl Downstream {
+    pub async fn scan(&self) -> anyhow::Result<Vec<Watched>> {
+        debug!(name = self.name, "Scanning downstream");
+        let mut results = Vec::new();
+        for root in &self.roots {
+            let mut root_results = root.scan().await?;
+            results.append(&mut root_results);
+        }
+        info!("Found {} downstream watches", results.len());
+        Ok(results)
     }
-    if !(downstream_root.is_file() || downstream_root.is_dir()) {
-        bail!("Scan root is not a file or directory: {root_display}")
+}
+
+pub struct SourceRoot {
+    pub id: String,
+    pub path: PathBuf,
+    pub includes: Vec<(Pattern, Mode)>,
+    pub excludes: Vec<(Pattern, Mode)>,
+}
+
+impl SourceRoot {
+    pub async fn scan(&self) -> anyhow::Result<Vec<Watched>> {
+        debug!(path = %self.path.display(), "Scanning downstream root");
+        // Pre-check roots
+        if !self.path.exists() {
+            bail!("Scan root does not exist: {}", self.path.display())
+        }
+
+        if !(self.path.is_file() || self.path.is_dir()) {
+            bail!(
+                "Scan root is not a file or directory: {}",
+                self.path.display()
+            )
+        }
+
+        // Enumerate and filter files
+        let all_rust_files = enumerate_rust_files(&self.path).await?;
+        let unfiltered_file_count = all_rust_files.len();
+
+        let files: Vec<PathBuf> = all_rust_files
+            .into_iter()
+            .filter(|path| {
+                let path = BStr::new(path.as_os_str().as_encoded_bytes());
+                if !self
+                    .includes
+                    .iter()
+                    .any(|(pattern, mode)| pattern.matches(path, *mode))
+                {
+                    return false;
+                }
+
+                if self
+                    .excludes
+                    .iter()
+                    .any(|(pattern, mode)| pattern.matches(path, *mode))
+                {
+                    return false;
+                }
+
+                true
+            })
+            .collect();
+        debug!(
+            "Processing {}/{} rust files",
+            files.len(),
+            unfiltered_file_count
+        );
+
+        let mut join_set = JoinSet::new();
+        for path in files {
+            join_set.spawn(async move { extract_annotations(&path).await });
+        }
+
+        let watches = join_set
+            .join_all()
+            .await
+            .into_iter()
+            .collect::<anyhow::Result<Vec<Vec<Watched>>>>()?
+            .into_iter()
+            .flatten()
+            .collect::<Vec<Watched>>();
+
+        Ok(watches)
     }
-
-    let files = enumerate_rust_files(downstream_root).await?;
-    info!("Found {} files to parse in {root_display}", files.len());
-
-    // TODO Parallelize downstream scan
-    let mut join_set = JoinSet::new();
-    for path in files {
-        join_set.spawn(async move { extract_annotations(path).await });
-    }
-
-    let watches = join_set
-        .join_all()
-        .await
-        .into_iter()
-        .collect::<anyhow::Result<Vec<Vec<Watched>>>>()?
-        .into_iter()
-        .flatten()
-        .collect::<Vec<Watched>>();
-    info!("Found {} watched items", watches.len());
-
-    Ok(watches)
 }
 
 /// Find all rust files in the provided path.
-async fn enumerate_rust_files(root: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
+async fn enumerate_rust_files(root: &PathBuf) -> anyhow::Result<Vec<PathBuf>> {
     let rust_files = WalkDir::new(root)
-        .sort_by_file_name()
         .into_iter()
         .collect::<Result<Vec<DirEntry>, walkdir::Error>>()?
         .iter()
@@ -118,7 +172,7 @@ async fn enumerate_rust_files(root: PathBuf) -> anyhow::Result<Vec<PathBuf>> {
 }
 
 /// Find and return annotations in file
-async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
+async fn extract_annotations(path: &PathBuf) -> anyhow::Result<Vec<Watched>> {
     let rust: Language = tree_sitter_rust::LANGUAGE.into();
     let attribute_query =
         Query::new(&rust, RAWR_ATTRIBUTE_QUERY).context("Compile annotation query")?;
@@ -230,16 +284,4 @@ async fn extract_annotations(path: PathBuf) -> anyhow::Result<Vec<Watched>> {
     }
 
     Ok(watches)
-}
-
-pub struct Downstream {
-    pub name: String,
-    pub roots: Vec<SourceRoot>,
-}
-
-pub struct SourceRoot {
-    pub id: String,
-    pub path: PathBuf,
-    pub includes: Vec<(Pattern, Mode)>,
-    pub excludes: Vec<(Pattern, Mode)>,
 }
