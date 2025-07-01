@@ -3,9 +3,9 @@
 //! Search for file and extract information from any annotations
 // DESIGN find and match with language machinery, parse matches with syn.
 
-use crate::DatabaseArgs;
 use crate::downstream::annotated::{WatchLocation, Watched};
 use crate::downstream::{Literal, annotated};
+use crate::{DatabaseArgs, matched_outer_range};
 use anyhow::{Context, bail};
 use clap::Args;
 use gix::bstr::BStr;
@@ -22,7 +22,7 @@ use syn::{LitBool, LitFloat, LitInt, LitStr};
 use thiserror::__private::AsDisplay;
 use tokio::task::JoinSet;
 use tracing::{debug, error, info, trace, warn};
-use tree_sitter::{Language, Parser, Query, QueryCapture, QueryCursor};
+use tree_sitter::{Language, Parser, Query, QueryCapture, QueryCursor, Range};
 use walkdir::{DirEntry, WalkDir};
 
 /// Tree-Sitter query for rawr attributes. Only the outermost structure is matched,
@@ -72,7 +72,6 @@ impl Downstream {
             let mut root_results = root.scan().await?;
             results.append(&mut root_results);
         }
-        info!("Found {} downstream watches", results.len());
         Ok(results)
     }
 }
@@ -208,6 +207,8 @@ async fn extract_annotations(path: &PathBuf) -> anyhow::Result<Vec<Watched>> {
             continue;
         };
 
+        let range = matched_outer_range(&attribute_match);
+
         let mut args_cursor = QueryCursor::new();
         let mut arg_matches = args_cursor.matches(&args_query, args.node, source_bytes.as_slice());
 
@@ -270,8 +271,8 @@ async fn extract_annotations(path: &PathBuf) -> anyhow::Result<Vec<Watched>> {
             args.insert(identifier, literal);
         }
 
-        // TODO Capture file and position in errors.
-        let watched = Watched::try_from(args)
+        // Build watch result, or concatenate errors
+        let watched = Watched::make_from(path, range, args)
             .map_err(|errs| {
                 errs.iter()
                     .map(|err| err.as_display().to_string())

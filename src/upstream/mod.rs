@@ -23,7 +23,7 @@ use streaming_iterator::StreamingIterator;
 use tokio::fs;
 use tokio::task::JoinSet;
 use tracing::{debug, trace};
-use tree_sitter::{Language, Parser, Point, QueryCursor, Range};
+use tree_sitter::{Language, Parser, Point, QueryCursor, QueryMatch, Range};
 use url::Url;
 use walkdir::{DirEntry, WalkDir};
 
@@ -110,8 +110,6 @@ impl SourceRoot {
         upstream: &Upstream,
         revision: &str,
     ) -> anyhow::Result<Vec<UpstreamMatch>> {
-        let mut matched_items = Vec::new();
-
         let repo_path = upstream.path.clone();
         let repo_sync = gix::open(&repo_path)
             .with_context(|| format!("Open git repo at {}", &repo_path.display()))?
@@ -187,7 +185,7 @@ impl SourceRoot {
             });
         }
 
-        let results = set
+        let matched_items = set
             .join_all()
             .await
             .into_iter()
@@ -195,7 +193,6 @@ impl SourceRoot {
             .into_iter()
             .flatten()
             .collect::<Vec<UpstreamMatch>>();
-        println!("Found {} results", results.len());
 
         Ok(matched_items)
     }
@@ -251,25 +248,7 @@ fn process_file_entry(
                 }
             };
 
-            // Build outer range for match.
-            let mut range = Range {
-                start_byte: usize::MAX,
-                end_byte: usize::MIN,
-                start_point: Point::default(),
-                end_point: Point::default(),
-            };
-            for cap in matched.captures {
-                // Find the lowest start point
-                if cap.node.start_byte() <= range.start_byte {
-                    range.start_byte = cap.node.start_byte();
-                    range.start_point = cap.node.start_position();
-                }
-                // Find the highest endpoint
-                if cap.node.end_byte() >= range.end_byte {
-                    range.end_byte = cap.node.end_byte();
-                    range.end_point = cap.node.end_position();
-                }
-            }
+            let range = crate::matched_outer_range(matched);
 
             // Extract full body of match and compute checksum
             let body_checksum = Extractor::checksum_whole_match::<Sha256>(matched, data)?;

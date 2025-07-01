@@ -4,7 +4,9 @@
 
 use crate::downstream::Literal;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use thiserror::Error;
+use tree_sitter::Range;
 
 /// Points at an UpstreamMatch in the database.
 ///
@@ -52,6 +54,13 @@ pub struct Watched {
 
     /// Ignore this item in the upstream.
     pub ignore: Option<bool>,
+
+    /// File containing watch definition
+    pub defined_in_file: PathBuf,
+
+    /// Location of watch definition within file
+    pub defined_in_file_at: Range,
+    // TODO Upstream Range for disambiguation
 }
 
 #[derive(Debug, Error)]
@@ -65,18 +74,19 @@ pub enum ParseWatchedError {
     },
 }
 
-// DESIGN Parse with syn or use derive_builder crate.
-impl TryFrom<HashMap<String, Literal>> for Watched {
-    type Error = Vec<ParseWatchedError>;
-
-    fn try_from(value: HashMap<String, Literal>) -> Result<Self, Self::Error> {
+impl Watched {
+    pub fn make_from(
+        path: &PathBuf,
+        range: Range,
+        params: HashMap<String, Literal>,
+    ) -> Result<Self, Vec<ParseWatchedError>> {
         use ParseWatchedError::*;
 
         let mut errors = Vec::new();
 
         // Upstream - Optional String
         let key = "upstream";
-        let upstream = match value.get(key) {
+        let upstream = match params.get(key) {
             Some(Literal::String(s)) => Some(s).cloned(),
             Some(_) => {
                 errors.push(IncorrectArgType {
@@ -90,7 +100,7 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
 
         // Revision - Required String
         let key = "rev";
-        let revision = match value.get(key) {
+        let revision = match params.get(key) {
             Some(Literal::String(s)) => Some(s).cloned(),
             Some(_) => {
                 errors.push(IncorrectArgType {
@@ -109,7 +119,7 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
 
         // File - Required String
         let key = "file";
-        let file = match value.get(key) {
+        let file = match params.get(key) {
             Some(Literal::String(s)) => Some(s).cloned(),
             Some(_) => {
                 errors.push(IncorrectArgType {
@@ -128,7 +138,7 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
 
         // Kind - Required String
         let key = "kind";
-        let kind = match value.get(key) {
+        let kind = match params.get(key) {
             Some(Literal::String(s)) => Some(s).cloned(),
             Some(_) => {
                 errors.push(IncorrectArgType {
@@ -147,7 +157,7 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
 
         // Identifier - Required String
         let key = "ident";
-        let identifier = match value.get(key) {
+        let identifier = match params.get(key) {
             Some(Literal::String(s)) => Some(s).cloned(),
             Some(_) => {
                 errors.push(IncorrectArgType {
@@ -161,7 +171,7 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
 
         // State - Optional String
         let key = "state";
-        let state = match value.get(key) {
+        let state = match params.get(key) {
             Some(Literal::String(s)) => Some(s).cloned(),
             Some(_) => {
                 errors.push(IncorrectArgType {
@@ -175,7 +185,7 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
 
         // Action - Optional String
         let key = "action";
-        let action = match value.get(key) {
+        let action = match params.get(key) {
             Some(Literal::String(s)) => Some(s).cloned(),
             Some(_) => {
                 errors.push(IncorrectArgType {
@@ -189,7 +199,7 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
 
         // Notes - Optional String
         let key = "notes";
-        let notes = match value.get(key) {
+        let notes = match params.get(key) {
             Some(Literal::String(s)) => Some(s).cloned(),
             Some(_) => {
                 errors.push(IncorrectArgType {
@@ -203,7 +213,7 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
 
         // Ignore - Optional Boolean
         let key = "ignore";
-        let ignore = match value.get(key) {
+        let ignore = match params.get(key) {
             Some(Literal::Boolean(b)) => Some(b).cloned(),
             Some(_) => {
                 errors.push(IncorrectArgType {
@@ -248,6 +258,8 @@ impl TryFrom<HashMap<String, Literal>> for Watched {
             action,
             notes,
             ignore,
+            defined_in_file: path.clone(),
+            defined_in_file_at: range,
         })
     }
 }

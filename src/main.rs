@@ -5,6 +5,8 @@
 use anyhow::{Context, bail};
 use clap::Parser;
 use gix_glob::wildmatch::Mode;
+use rawr::compare;
+use rawr::compare::CompareArgs;
 use rawr::downstream::scan;
 use rawr::downstream::scan::Downstream;
 use rawr::downstream::scan::DownstreamScanArgs;
@@ -12,6 +14,7 @@ use rawr::lang::LanguageDefinition;
 use rawr::lang::java::Java;
 use rawr::upstream::{SourceRoot, Upstream, UpstreamScanArgs};
 use std::sync::Arc;
+use tracing::{debug, info};
 
 #[derive(Parser, Debug)]
 enum Cmd {
@@ -22,7 +25,7 @@ enum Cmd {
     DownstreamWatches(DownstreamScanArgs),
 
     /// Compare the watched items to those in the upstream
-    DownstreamCompare,
+    DownstreamCompare(CompareArgs),
 }
 
 #[tokio::main]
@@ -87,9 +90,61 @@ async fn main() -> anyhow::Result<()> {
                     },
                 ],
             };
-            downstream.scan().await?;
+            let matches = downstream.scan().await?;
+            info!("Found {} downstream watches", matches.len());
         }
-        Cmd::DownstreamCompare => {}
+        Cmd::DownstreamCompare(args) => {
+            let upstream = Upstream {
+                id: "generic-java".into(),
+                name: "Java Test".into(),
+                path: args.upstream_repo,
+                repo: None,
+                roots: vec![SourceRoot {
+                    id: "java".into(),
+                    name: "Java".into(),
+                    dialect: Arc::new(Java {}.configuration()?),
+                    notes: None,
+                    includes: vec![(
+                        gix_glob::parse("**/*.java").context("Glob must be valid")?,
+                        Mode::NO_MATCH_SLASH_LITERAL,
+                    )],
+                    excludes: vec![],
+                }],
+                notes: Some("This should come from a config file.".into()),
+            };
+            let upstream_matches = upstream.scan(&args.upstream_revision).await?;
+            info!("Found {} upstream matches", upstream_matches.len());
+
+            let downstream = Downstream {
+                name: "self".into(),
+                roots: vec![
+                    scan::SourceRoot {
+                        id: "tests".to_string(),
+                        path: "tests".into(),
+                        includes: vec![(
+                            gix_glob::parse("**/*.rs").context("Glob must be valid")?,
+                            Mode::NO_MATCH_SLASH_LITERAL,
+                        )],
+                        excludes: vec![],
+                    },
+                    scan::SourceRoot {
+                        id: "lib".to_string(),
+                        path: "src".into(),
+                        includes: vec![(
+                            gix_glob::parse("**/*.rs").context("Glob must be valid")?,
+                            Mode::NO_MATCH_SLASH_LITERAL,
+                        )],
+                        excludes: vec![],
+                    },
+                ],
+            };
+
+            let downstream_watches = downstream.scan().await?;
+            info!("Found {} downstream watches", downstream_watches.len());
+
+            debug!("Compare against upstream");
+            compare::compare(downstream_watches, upstream_matches).await?;
+        }
     }
 
     Ok(())
