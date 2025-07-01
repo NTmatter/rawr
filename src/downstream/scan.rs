@@ -272,7 +272,7 @@ async fn extract_annotations(path: &PathBuf) -> anyhow::Result<Vec<Watched>> {
         }
 
         // Build watch result, or concatenate errors
-        let watched = Watched::make_from(path, range, args)
+        let watched = Watched::try_from((path, &range, &args))
             .map_err(|errs| {
                 errs.iter()
                     .map(|err| err.as_display().to_string())

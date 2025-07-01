@@ -3,6 +3,7 @@
 //! Tools for matching and extracting information from RAWR Annotations.
 
 use crate::downstream::Literal;
+use crate::downstream::annotated::ParseWatchedError::{IncorrectArgType, MissingRequiredArg};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -74,13 +75,11 @@ pub enum ParseWatchedError {
     },
 }
 
-impl Watched {
-    pub fn make_from(
-        path: &PathBuf,
-        range: Range,
-        params: HashMap<String, Literal>,
-    ) -> Result<Self, Vec<ParseWatchedError>> {
-        use ParseWatchedError::*;
+impl TryFrom<(&PathBuf, &Range, &HashMap<String, Literal>)> for Watched {
+    type Error = Vec<ParseWatchedError>;
+
+    fn try_from(value: (&PathBuf, &Range, &HashMap<String, Literal>)) -> Result<Self, Self::Error> {
+        let (path, range, params) = value;
 
         let mut errors = Vec::new();
 
@@ -259,7 +258,7 @@ impl Watched {
             notes,
             ignore,
             defined_in_file: path.clone(),
-            defined_in_file_at: range,
+            defined_in_file_at: *range,
         })
     }
 }
