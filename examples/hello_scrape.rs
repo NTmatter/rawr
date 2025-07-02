@@ -302,7 +302,7 @@ fn match_whole_file(path: &BString, rev: Id, blob: &Blob) -> UpstreamMatch {
     UpstreamMatch {
         upstream: "(self)".to_string(),
         revision: rev.to_string(),
-        file: path.to_string(),
+        path: path.to_string(),
         start_byte: 0,
         length: blob.data.len() as u64,
         kind: "file".to_string(),
@@ -414,7 +414,7 @@ fn process_match(
     Some(UpstreamMatch {
         upstream: codebase.to_string(),
         revision: revision.to_string(),
-        file: file_path.to_string(),
+        path: file_path.to_string(),
         start_byte,
         length,
         kind: matcher.kind.to_string(),

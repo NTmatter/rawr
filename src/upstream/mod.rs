@@ -277,7 +277,7 @@ fn process_file_entry(
             let upstream_match = UpstreamMatch {
                 upstream: upstream_id.to_string(),
                 revision: revision.to_string(),
-                file,
+                path: file,
                 range,
                 lang: dialect.name.to_string(),
                 kind: matcher.kind.to_string(),

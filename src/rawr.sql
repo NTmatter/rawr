@@ -2,13 +2,13 @@
 
 -- Table: Upstream Codebase
 -- Describes a codebase of interest
-CREATE TABLE IF NOT EXISTS upstream
-(
-    id            INT  NOT NULL PRIMARY KEY,
-    name          TEXT NOT NULL UNIQUE,
-    relative_path TEXT NOT NULL,
-    notes         TEXT
-) STRICT;
+-- CREATE TABLE IF NOT EXISTS upstream
+-- (
+--     id            INT  NOT NULL PRIMARY KEY,
+--     name          TEXT NOT NULL UNIQUE,
+--     relative_path TEXT NOT NULL,
+--     notes         TEXT
+-- ) STRICT;
 
 -- Table: Upstream Items of Interest
 -- Stores all items of interest at all revisions.
@@ -23,15 +23,10 @@ CREATE TABLE IF NOT EXISTS upstream
     revision      TEXT    NOT NULL,
 
     -- Relative path to containing file.
-    file          TEXT    NOT NULL,
+    path          TEXT    NOT NULL,
 
-    start_byte    INTEGER NOT NULL,
-    end_byte      INTEGER NOT NULL,
-
-    start_line    INTEGER NOT NULL,
-    start_column  INTEGER NOT NULL,
-    end_line      INTEGER NOT NULL,
-    end_column    INTEGER NOT NULL,
+    -- Name of the tree sitter grammar
+    lang          TEXT    NOT NULL,
 
     -- Kind of matched item, extracted from matcher
     kind          TEXT    NOT NULL,
@@ -48,23 +43,31 @@ CREATE TABLE IF NOT EXISTS upstream
     -- reformatting.
     hash_stripped BLOB,
 
+    -- Range information
+    start_byte    INTEGER NOT NULL,
+    end_byte      INTEGER NOT NULL,
+
+    start_line    INTEGER NOT NULL,
+    start_column  INTEGER NOT NULL,
+    end_line      INTEGER NOT NULL,
+    end_column    INTEGER NOT NULL,
+
     -- Optional notes regarding item.
     notes         TEXT,
 
 
-    -- Prevent duplicates of already-processed data.
-    CONSTRAINT UQ_upstream UNIQUE (upstream, revision, file, start_byte, kind, identifier, hash)
+    -- Physical ordering and uniqueness
+    CONSTRAINT PK_upstream PRIMARY KEY (upstream, revision, path, lang, kind, identifier, hash, start_byte)
 
 -- Skip FK for now, to simplify build.
 --     CONSTRAINT FK_upstream_codebase FOREIGN KEY (codebase)
 --         REFERENCES codebase (name) ON DELETE CASCADE ON UPDATE CASCADE
 ) STRICT;
 
--- Index: Upstream primary query
--- Expect intensive lookups across an item's history.
-CREATE INDEX IF NOT EXISTS IX_upstream_item_history ON upstream (codebase, path, identifier, kind, revision);
+-- Index: Item History
+-- Track an item across many revisions
+CREATE INDEX IF NOT EXISTS IX_upstream_item_history ON upstream (upstream, lang, kind, identifier, path, revision);
 
--- Index: Hash Lookup
--- Expect for lookups by hash, looking for duplicates by type, varying identifier,
--- and across codebases.
-CREATE INDEX IF NOT EXISTS IX_upstream_hash ON upstream (codebase, hash, kind, identifier);
+-- Index: Lookup by Hash
+-- Get item info based on hash and other attributes
+CREATE INDEX IF NOT EXISTS IX_upstream_hash ON upstream (hash, kind, identifier, lang, revision, upstream);

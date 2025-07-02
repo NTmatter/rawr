@@ -25,7 +25,7 @@ pub struct UpstreamMatch {
     pub revision: String,
 
     /// Relative path to file within the upstream codebase.
-    pub file: PathBuf,
+    pub path: PathBuf,
 
     /// Location of item within file, as byte offset and line/character
     pub range: Range,
@@ -55,3 +55,5 @@ pub struct UpstreamMatch {
     /// Given the automated sourcing of these matches, notes are unlikely.
     pub notes: Option<String>,
 }
+
+// INSERT INTO upstream ( ... ) VALUES ( ... ) ON CONFLICT IGNORE;

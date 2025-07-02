@@ -242,7 +242,7 @@ fn process_match(
     Some(UpstreamMatch {
         upstream: codebase.to_string(),
         revision: revision.to_string(),
-        file: file_path.to_string(),
+        path: file_path.to_string(),
         start_byte,
         length,
         kind: matcher.kind.to_string(),
