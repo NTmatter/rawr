@@ -8,7 +8,7 @@ use anyhow::{Context, bail};
 use clap::Parser;
 use gix::bstr::BStr;
 use gix::revision::walk::Info;
-use rawr::db_connection;
+use rawr::db::connect_rw;
 use rawr::upstream::matched::UpstreamMatch;
 use std::path::PathBuf;
 use tracing::{trace, warn};
@@ -59,7 +59,7 @@ fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     // Fetch initial (mut hash, mut hash_stripped) from database.
-    let db = db_connection(db_path)?;
+    let db = connect_rw(db_path)?;
     let items = UpstreamMatch::get_watched_item_at_revision(
         &db,
         &codebase,

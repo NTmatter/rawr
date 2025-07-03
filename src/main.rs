@@ -5,14 +5,15 @@
 use anyhow::{Context, bail};
 use clap::Parser;
 use gix_glob::wildmatch::Mode;
-use rawr::compare;
 use rawr::compare::CompareArgs;
 use rawr::downstream::scan;
 use rawr::downstream::scan::Downstream;
 use rawr::downstream::scan::DownstreamScanArgs;
 use rawr::lang::LanguageDefinition;
 use rawr::lang::java::Java;
+use rawr::upstream::matched::UpstreamMatch;
 use rawr::upstream::{SourceRoot, Upstream, UpstreamScanArgs};
+use rawr::{compare, db};
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -94,6 +95,8 @@ async fn main() -> anyhow::Result<()> {
             info!("Found {} downstream watches", matches.len());
         }
         Cmd::DownstreamCompare(args) => {
+            let conn = db::connect_rw(args.database)?;
+
             let upstream = Upstream {
                 id: "generic-java".into(),
                 name: "Java Test".into(),
@@ -114,6 +117,10 @@ async fn main() -> anyhow::Result<()> {
             };
             let upstream_matches = upstream.scan(&args.upstream_revision).await?;
             info!("Found {} upstream matches", upstream_matches.len());
+            let _affected = UpstreamMatch::insert_batch(&conn, &upstream_matches)?;
+            // if let Err((_conn, err)) = conn.close() {
+            //     bail!("Could not close initial database connection {err:?}");
+            // }
 
             let downstream = Downstream {
                 name: "self".into(),
@@ -143,7 +150,7 @@ async fn main() -> anyhow::Result<()> {
             info!("Found {} downstream watches", downstream_watches.len());
 
             debug!("Compare against upstream");
-            compare::compare(downstream_watches, upstream_matches).await?;
+            // compare::compare(downstream_watches, upstream_matches).await?;
         }
     }
 

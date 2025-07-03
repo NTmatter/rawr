@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 extern crate rawr_macro;
-use anyhow::Context;
-use clap::Args;
-use rusqlite::Connection;
-use std::path::PathBuf;
-use url::Url;
 
 pub mod compare;
+pub mod db;
 pub mod downstream;
 pub mod lang;
 pub mod upstream;
@@ -14,25 +10,6 @@ pub mod upstream;
 // Re-export macros for library users.
 pub use rawr_macro::{Rawr, rawr, rawr_fn};
 use tree_sitter::{Point, QueryMatch, Range};
-
-#[derive(Args, Clone, Debug)]
-pub struct DatabaseArgs {
-    /// Connection URL for database.
-    #[arg(long, default_value = "sqlite://./rawr.sqlite")]
-    pub database: Url,
-}
-
-pub fn db_connection(db_path: PathBuf) -> anyhow::Result<Connection> {
-    // TODO Disable Open with URI flag with `Connection::open_with_flags`
-    let conn = Connection::open(db_path).context("Open or create database")?;
-    conn.pragma_update(None, "foreign_keys", "ON")
-        .context("Enable foreign key support")?;
-
-    conn.execute_batch(include_str!("rawr.sql"))
-        .context("Create tables if needed")?;
-
-    Ok(conn)
-}
 
 /// Represent the type of change to an item in a given revision
 #[derive(Debug, Hash, Eq, PartialEq)]

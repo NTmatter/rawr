@@ -9,7 +9,7 @@ use clap::Parser as ClapParser;
 use gix::bstr::BString;
 use gix::traverse::tree::Recorder;
 use gix::{Blob, Id, ObjectId, Repository};
-use rawr::db_connection;
+use rawr::db::connect_rw;
 #[cfg(feature = "lang-bash")]
 use rawr::lang::bash::Bash;
 use rawr::lang::rust::Rust;
@@ -63,7 +63,7 @@ fn main() -> anyhow::Result<()> {
     let repo = gix::discover(repo_path).context("Repository exists at provided path")?;
     debug!("Repo uses hash type {}", repo.object_hash());
 
-    let db = db_connection(db_path)?;
+    let db = connect_rw(db_path)?;
 
     // TODO Consider a concurrent hashmap
     let mut cache: HashMap<MemoKey, Vec<UpstreamMatch>> = HashMap::new();

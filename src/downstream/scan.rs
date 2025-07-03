@@ -3,9 +3,10 @@
 //! Search for file and extract information from any annotations
 // DESIGN find and match with language machinery, parse matches with syn.
 
+use crate::db::DatabaseArgs;
 use crate::downstream::annotated::{WatchLocation, Watched};
 use crate::downstream::{Literal, annotated};
-use crate::{DatabaseArgs, matched_outer_range};
+use crate::matched_outer_range;
 use anyhow::{Context, bail};
 use clap::Args;
 use gix::bstr::BStr;

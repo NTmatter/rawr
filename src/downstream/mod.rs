@@ -5,7 +5,7 @@
 
 #![allow(unused, reason = "Early development")]
 
-use crate::DatabaseArgs;
+use crate::db::DatabaseArgs;
 use crate::downstream::annotated::Watched;
 use crate::upstream::matched::UpstreamMatch;
 use annotated::WatchLocation;

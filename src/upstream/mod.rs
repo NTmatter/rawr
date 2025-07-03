@@ -2,7 +2,7 @@
 
 #![allow(unused)]
 
-use crate::DatabaseArgs;
+use crate::db::DatabaseArgs;
 use crate::lang::java::Java;
 use crate::lang::{Dialect, LanguageDefinition};
 use crate::upstream::matched::UpstreamMatch;

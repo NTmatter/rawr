@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::DatabaseArgs;
+#![allow(unused, reason = "Early development")]
+
+use crate::db::DatabaseArgs;
 use crate::downstream::annotated::Watched;
 use crate::upstream::Upstream;
 use crate::upstream::matched::UpstreamMatch;

@@ -90,3 +90,5 @@ Some languages will still need comment parsing, but nested languages are a probl
 * [Tree-Sitter](https://tree-sitter.github.io/): Extract representation of codebases.
 * [Byron/gitoxide](https://github.com/Byron/gitoxide): Traverse repositories to identify changes.
 * [git-notes](https://git-scm.com/docs/git-notes): Add custom metadata and annotations to git commits.
+* [C++11 Generalized Attributes](https://www.codesynthesis.com/~boris/blog/2012/04/18/cxx11-generalized-attributes/): Enough for a C++ downstream? 
+  * Supports strings, see bottom-most examples.
