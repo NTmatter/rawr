@@ -119,6 +119,7 @@ impl SourceRoot {
         let rev = repo
             .rev_parse_single(revision)
             .with_context(|| format!("Get revision for {revision}"))?;
+        let revision = rev.to_string();
         let tree = rev
             .object()
             .context("Object must exist for known-good revision")?
