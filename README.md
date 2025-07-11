@@ -11,3 +11,4 @@ RAWR leverages Tree-Sitter to track points of interest in the upstream codebase,
   * [Playground](https://tree-sitter.github.io/tree-sitter/7-playground.html)
 * [Byron/gitoxide](https://github.com/Byron/gitoxide): Traverse repositories to identify changes.
 * [git-notes](https://git-scm.com/docs/git-notes): Add custom metadata and annotations to git commits.
+* [afnanenayet/diffsitter](https://github.com/afnanenayet/diffsitter): Semantic diff tool also written in Rust, also leveraging TreeSitter.
