@@ -20,7 +20,7 @@ use std::str::FromStr;
 use streaming_iterator::StreamingIterator;
 use syn::parse::Parse;
 use syn::{LitBool, LitFloat, LitInt, LitStr};
-use thiserror::__private::AsDisplay;
+use thiserror::__private18::AsDisplay;
 use tokio::task::JoinSet;
 use tracing::{debug, error, info, trace, warn};
 use tree_sitter::{Language, Parser, Query, QueryCapture, QueryCursor, Range};
@@ -276,7 +276,7 @@ async fn extract_annotations(path: &PathBuf) -> anyhow::Result<Vec<Watched>> {
         let watched = Watched::try_from((path, &range, &args))
             .map_err(|errs| {
                 errs.iter()
-                    .map(|err| err.as_display().to_string())
+                    .map(|err| err.to_string())
                     .collect::<Vec<_>>()
                     .join("\n")
             })

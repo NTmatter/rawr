@@ -5,7 +5,6 @@ use clap::Args;
 use rusqlite::{Connection, OpenFlags};
 use std::path::PathBuf;
 use tracing::debug;
-use url::Url;
 
 #[derive(Args, Clone, Debug)]
 pub struct DatabaseArgs {
@@ -22,7 +21,7 @@ pub fn connect_rw(args: DatabaseArgs) -> anyhow::Result<Connection> {
     // Default flags as per https://docs.rs/rusqlite/latest/rusqlite/struct.OpenFlags.html
     // SQLITE_OPEN_READ_WRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_URI | SQLITE_OPEN_NO_MUTEX
     // Disable OPEN_URI for now.
-    let open_flags = OpenFlags::SQLITE_OPEN_READ_WRITE
+    let _open_flags = OpenFlags::SQLITE_OPEN_READ_WRITE
         | OpenFlags::SQLITE_OPEN_CREATE
         | OpenFlags::SQLITE_OPEN_NO_MUTEX;
 

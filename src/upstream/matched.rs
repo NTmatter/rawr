@@ -88,12 +88,12 @@ VALUES
             ":identifier": &self.identifier,
             ":hash": &self.hash,
             ":hash_stripped": &self.hash_stripped,
-            ":start_byte": &self.range.start_byte,
-            ":end_byte": &self.range.end_byte,
-            ":start_line": &self.range.start_point.row,
-            ":start_column": &self.range.start_point.column,
-            ":end_line": &self.range.end_point.row,
-            ":end_column": &self.range.end_point.column,
+            ":start_byte": &(self.range.start_byte as isize),
+            ":end_byte": &(self.range.end_byte as isize),
+            ":start_line": &(self.range.start_point.row as isize),
+            ":start_column": &(self.range.start_point.column as isize),
+            ":end_line": &(self.range.end_point.row as isize),
+            ":end_column": &(self.range.end_point.column as isize),
             ":notes": &self.notes,
         })?;
 

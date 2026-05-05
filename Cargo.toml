@@ -17,14 +17,15 @@ rawr_macro = { version = "0.1.0", path = "../rawr_attribute/rawr_macro" }
 anyhow = "1.0.98"
 clap = { version = "4.5.40", features = ["derive"] }
 dotenv = "0.15.0"
-gix = { version = "0.72.1", features = ["parallel"] }
-rusqlite = { version = "0.36.0", features = ["bundled"] }
-sha2 = "0.10.9"
-toml = { version = "0.8.23", features = ["parse"] }
+gix = { version = "0.83.0", features = ["parallel"] }
+rusqlite = { version = "0.39.0", features = ["bundled"] }
+hex = "0.4.3"
+sha2 = "0.11.0"
+toml = { version = "1.1.2", features = ["parse"] }
 
 # TreeSitter and language support
-tree-sitter = "0.25.6"
-tree-sitter-language = "0.1.5"
+tree-sitter = "0.26.8"
+tree-sitter-language = "0.1.7"
 
 # Optional language support
 tree-sitter-bash = { version = "0.25.0", optional = true }
@@ -43,7 +44,7 @@ syn = { version = "2.0.104", default-features = false, features = ["parsing"] }
 tokio = { version = "1.45.1", features = ["full"] }
 thiserror = "2.0.12"
 walkdir = "2.5.0"
-gix-glob = "0.20.1"
+gix-glob = "0.26.0"
 
 [build-dependencies]
 cc = "*"

@@ -267,7 +267,7 @@ fn process_file_entry(
                 .unwrap_or("(no ident)".to_string());
 
             trace!(
-                checksum = format!("{:02x}", body_checksum),
+                checksum = hex::encode(body_checksum),
                 file = entry.filepath.to_string(),
                 kind = matcher.kind,
                 ident = identifier,

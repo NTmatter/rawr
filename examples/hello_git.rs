@@ -64,7 +64,7 @@ fn main() -> anyhow::Result<()> {
 
     // We can get the raw bytes,
     let binding = tests_upstream.object()?.into_blob().take_data();
-    let file_data = binding.as_slice();
+    let _file_data = binding.as_slice();
 
     // The raw bytes can be passed directly to Tree-Sitter.
     #[cfg(feature = "lang-bash")]
