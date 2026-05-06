@@ -1,0 +1,99 @@
+-- Table: Git repositories
+DEFINE TABLE repository SCHEMAFULL
+    COMMENT "Git repository containing inspected source code";
+DEFINE FIELD id ON repository TYPE string
+    ASSERT $value = string::slug($value)
+    COMMENT "Repository slug, matching string::slug";
+DEFINE FIELD repo_url ON repository TYPE string
+    ASSERT string::is_url($value);
+
+
+-- Table: Repo revisions and topology
+DEFINE TABLE revision SCHEMAFULL
+    COMMENT "Git commits within a repository";
+DEFINE FIELD id ON revision TYPE array
+    ASSERT
+        array::len($value) = 2
+        AND type::is_record($value[0], "repository")
+        AND type::is_string($value[1]);
+DEFINE FIELD repo ON revision
+    TYPE record<repository>
+    ASSERT $value != NONE AND $value.* != NONE;
+DEFINE FIELD sha ON revision
+  TYPE string
+  VALUE string::lowercase($value)
+  ASSERT string::matches($value, "^([0-9a-f]{40}|[0-9a-f]{64})$");
+DEFINE FIELD parents ON revision
+  TYPE array<record<revision>>;
+
+
+-- Repo heads
+-- TODO Use id: [record<repository>, record]
+DEFINE TABLE head SCHEMAFULL;
+DEFINE FIELD id on head TYPE array
+    ASSERT
+        array::len($value) = 2
+        AND type::is_record($value[0], "repository")
+        AND type::is_string($value[1]);
+DEFINE FIELD repo ON head TYPE record<repository>
+    ASSERT $value != NONE AND $value.* != NONE;
+DEFINE FIELD name ON head TYPE string;
+DEFINE FIELD rev ON head TYPE record<revision>
+    ASSERT $value != NONE AND $value.* != NONE;
+DEFINE INDEX UQ_head_repo_name ON head FIELDS repo, name UNIQUE;
+
+
+-- Semantic entities, partial tree-sitter objects
+DEFINE TABLE semantic_entity SCHEMAFULL;
+DEFINE FIELD id ON semantic_entity TYPE array
+    ASSERT
+        array::len($value) = 3
+        AND type::is_record($value[0], "repository")
+        AND type::is_record($value[1], "revision")
+        AND type::is_string($value[2]);
+
+DEFINE FIELD repo ON semantic_entity
+    TYPE record<repository>
+    ASSERT $value != NONE AND $value.* != NONE;
+DEFINE FIELD rev ON semantic_entity
+    TYPE record<revision>
+    ASSERT $value != NONE AND $value.* != NONE;
+DEFINE FIELD entity_id ON semantic_entity
+    TYPE string
+    ASSERT string::len() > 0;
+
+DEFINE FIELD file_path ON semantic_entity TYPE string;
+DEFINE FIELD entity_type ON semantic_entity TYPE string;
+DEFINE FIELD name ON semantic_entity TYPE string;
+DEFINE FIELD parent_id ON semantic_entity TYPE option<record<semantic_entity>>;
+-- Deduplicate content on hash. It's likely not needed in this context,
+-- and can be retrieved from the repository.
+-- DEFINE FIELD content ON semantic_entity TYPE option<string>;
+DEFINE FIELD content_hash ON semantic_entity TYPE string;
+DEFINE FIELD structural_hash ON semantic_entity TYPE option<string>;
+
+DEFINE FIELD start_line ON semantic_entity
+    TYPE int ASSERT $value >= 0;
+
+DEFINE FIELD end_line ON semantic_entity
+    TYPE int ASSERT $value >= 0 AND $value >= start_line;
+
+DEFINE FIELD metadata ON semantic_entity TYPE option<object>;
+
+
+-- Deduplicated content of semantic entities
+DEFINE TABLE semantic_entity_content SCHEMAFULL;
+DEFINE FIELD id ON semantic_entity_content TYPE array
+    ASSERT
+        array::len($value) = 2
+        AND type::is_record($value[0])
+        AND type::is_string($value[1]);
+DEFINE FIELD repo ON semantic_entity_content
+    TYPE record<repository>
+    ASSERT $value != NONE AND $value.* != NONE;
+DEFINE FIELD content_hash ON semantic_entity_content
+    TYPE string;
+
+DEFINE FIELD content ON semantic_entity_content TYPE string;
+DEFINE INDEX IX_semantic_entity_repo_hash
+    ON semantic_entity_content FIELDS repo, content_hash UNIQUE;
